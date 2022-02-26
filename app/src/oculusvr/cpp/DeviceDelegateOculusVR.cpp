@@ -72,7 +72,7 @@ struct DeviceDelegateOculusVR::State {
   };
 
   vrb::RenderContextWeak context;
-  JavaContext* javaContext = nullptr;
+  android_app* app = nullptr;
   bool initialized = false;
   bool applicationEntitled = false;
   bool layersEnabled = true;
@@ -135,9 +135,9 @@ struct DeviceDelegateOculusVR::State {
     elbow = ElbowModel::Create();
     vrb::RenderContextPtr localContext = context.lock();
 
-    java.Vm = javaContext->vm;
-    java.Vm->AttachCurrentThread(&java.Env, nullptr);
-    java.ActivityObject = java.Env->NewGlobalRef(javaContext->activity);
+    java.Vm = app->activity->vm;
+    (*app->activity->vm).AttachCurrentThread(&java.Env, NULL);
+    java.ActivityObject = java.Env->NewGlobalRef(app->activity->clazz);
 
     // Initialize the API.
     auto parms = vrapi_DefaultInitParms(&java);
@@ -165,20 +165,24 @@ struct DeviceDelegateOculusVR::State {
 
     reorientCount = vrapi_GetSystemStatusInt(&java, VRAPI_SYS_STATUS_RECENTER_COUNT);
 
+    vrapi_SetPropertyInt(&java, VRAPI_BLOCK_REMOTE_BUTTONS_WHEN_NOT_EMULATING_HMT, 0);
     // This needs to be set to 0 so that the volume buttons work. I'm not sure why since the
     // docs in the header indicate that setting this to false (0) means you have to
     // handle the gamepad events yourself.
     vrapi_SetPropertyInt(&java, VRAPI_EAT_NATIVE_GAMEPAD_EVENTS, 0);
+    // Reorient the headset after controller recenter.
+    vrapi_SetPropertyInt(&java, VRAPI_REORIENT_HMD_ON_CONTROLLER_RECENTER, 1);
 
     const char * appId = OCULUS_6DOF_APP_ID;
 
     const int type = vrapi_GetSystemPropertyInt(&java, VRAPI_SYS_PROP_DEVICE_TYPE);
-    if ((type >= VRAPI_DEVICE_TYPE_OCULUSQUEST_START) && (type <= VRAPI_DEVICE_TYPE_OCULUSQUEST_END)) {
+    if ((type >= VRAPI_DEVICE_TYPE_OCULUSGO_START ) && (type <= VRAPI_DEVICE_TYPE_OCULUSGO_END)) {
+      VRB_DEBUG("Detected Oculus Go");
+      deviceType = device::OculusGo;
+      appId = OCULUS_3DOF_APP_ID;
+    } else if ((type >= VRAPI_DEVICE_TYPE_OCULUSQUEST_START) && (type <= VRAPI_DEVICE_TYPE_OCULUSQUEST_END)) {
       VRB_DEBUG("Detected Oculus Quest");
       deviceType = device::OculusQuest;
-    } else if ((type >= VRAPI_DEVICE_TYPE_OCULUSQUEST2_START) && (type <= VRAPI_DEVICE_TYPE_OCULUSQUEST2_END)) {
-        VRB_DEBUG("Detected Oculus Quest 2");
-        deviceType = device::OculusQuest;
     } else {
       VRB_DEBUG("Detected Unknown Oculus device");
     }
@@ -702,10 +706,10 @@ struct DeviceDelegateOculusVR::State {
 };
 
 DeviceDelegateOculusVRPtr
-DeviceDelegateOculusVR::Create(vrb::RenderContextPtr& aContext, JavaContext* aJavaContext) {
+DeviceDelegateOculusVR::Create(vrb::RenderContextPtr& aContext, android_app *aApp) {
   DeviceDelegateOculusVRPtr result = std::make_shared<vrb::ConcreteClass<DeviceDelegateOculusVR, DeviceDelegateOculusVR::State> >();
   result->m.context = aContext;
-  result->m.javaContext = aJavaContext;
+  result->m.app = aApp;
   result->m.Initialize();
   return result;
 }
@@ -1366,7 +1370,7 @@ DeviceDelegateOculusVR::EnterVR(const crow::BrowserEGLContext& aEGLContext) {
   // No need to reset the FLAG_FULLSCREEN window flag when using a View
   modeParms.Flags &= ~VRAPI_MODE_FLAG_RESET_WINDOW_FULLSCREEN;
   modeParms.Display = reinterpret_cast<unsigned long long>(aEGLContext.Display());
-  modeParms.WindowSurface = reinterpret_cast<unsigned long long>(aEGLContext.NativeWindow());
+  modeParms.WindowSurface = reinterpret_cast<unsigned long long>(m.app->window);
   modeParms.ShareContext = reinterpret_cast<unsigned long long>(aEGLContext.Context());
 
   m.ovr = vrapi_EnterVrMode(&modeParms);
@@ -1384,6 +1388,7 @@ DeviceDelegateOculusVR::EnterVR(const crow::BrowserEGLContext& aEGLContext) {
 
   // Reset reorientation after Enter VR
   m.reorientMatrix = vrb::Matrix::Identity();
+  vrapi_SetRemoteEmulation(m.ovr, true);
 }
 
 void

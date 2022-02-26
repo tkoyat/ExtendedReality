@@ -4,8 +4,7 @@
   "description": "FxR asset compressor",
   "main": "index.js",
   "scripts": {
-    "build": "npm run compress",
-    "compress": "gulp compress"
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [
     "fxr",
@@ -15,11 +14,15 @@
   "author": "Mozilla",
   "license": "Apache-2.0",
   "devDependencies": {
-    "gulp": "^4.0.2"
+    "gulp": "^4.0.0"
   },
   "dependencies": {
-    "readdirp": "^3.6.0",
-    "sharp": "^0.29.0",
-    "tmp": "0.2.1"
+    "readdirp": "^2.2.1",
+    "sharp": "^0.21.1",
+    "tmp": "0.0.33"
+  },
+  "scripts": {
+    "build": "npm run compress",
+    "compress": "gulp compress"
   }
 }

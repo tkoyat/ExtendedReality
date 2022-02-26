@@ -251,8 +251,7 @@ public class VRBrowserActivity extends PlatformActivity implements WidgetManager
 
         BitmapCache.getInstance(this).onCreate();
 
-//        EngineProvider.INSTANCE.getOrCreateRuntime(this).appendAppNotesToCrashReport("Firefox Reality " + BuildConfig.VERSION_NAME + "-" + BuildConfig.VERSION_CODE + "-" + BuildConfig.FLAVOR + "-" + BuildConfig.BUILD_TYPE + " (" + BuildConfig.GIT_HASH + ")");
-        EngineProvider.INSTANCE.getOrCreateRuntime(this).appendAppNotesToCrashReport("Firefox Reality " + BuildConfig.VERSION_NAME + "-" + BuildConfig.VERSION_CODE + "-" + BuildConfig.FLAVOR + "-" + BuildConfig.BUILD_TYPE);
+        EngineProvider.INSTANCE.getOrCreateRuntime(this).appendAppNotesToCrashReport("Firefox Reality " + BuildConfig.VERSION_NAME + "-" + BuildConfig.VERSION_CODE + "-" + BuildConfig.FLAVOR + "-" + BuildConfig.BUILD_TYPE + " (" + BuildConfig.GIT_HASH + ")");
 
         // Create broadcast receiver for getting crash messages from crash process
         IntentFilter intentFilter = new IntentFilter();
@@ -594,18 +593,7 @@ public class VRBrowserActivity extends PlatformActivity implements WidgetManager
         if (extras != null) {
             // If there is no data uri and there is a url parameter we get that
             if (uri == null && extras.containsKey("url")) {
-                uri = Uri.parse(extras.getString("url"));
-            }
-            // SEND Actions received WebBrowser share dialogs
-            if (uri == null && extras.containsKey(Intent.EXTRA_TEXT)) {
-                String text = extras.getString(Intent.EXTRA_TEXT, "");
-                int i = text.indexOf("https://");
-                if (i < 0) {
-                    i = text.indexOf("http://");
-                }
-                if (i >= 0) {
-                    uri = Uri.parse(text.substring(i));
-                }
+                uri = Uri.parse(intent.getExtras().getString("url"));
             }
 
             // Overwrite the stored homepage
@@ -741,7 +729,7 @@ public class VRBrowserActivity extends PlatformActivity implements WidgetManager
             return;
         }
         if (!mWindows.handleBack()) {
-            if (DeviceType.isPicoVR() || DeviceType.isHVRBuild()) {
+            if (DeviceType.isPicoVR()) {
                 mWindows.getFocusedWindow().showConfirmPrompt(
                         getString(R.string.app_name),
                         getString(R.string.exit_confirm_dialog_body, getString(R.string.app_name)),
@@ -1164,7 +1152,9 @@ public class VRBrowserActivity extends PlatformActivity implements WidgetManager
     @Keep
     @SuppressWarnings("unused")
     private void setDeviceType(int aType) {
-        runOnUiThread(() -> DeviceType.setType(aType));
+        if (DeviceType.isOculusBuild() || DeviceType.isWaveBuild()) {
+            runOnUiThread(() -> DeviceType.setType(aType));
+        }
     }
 
     @Keep

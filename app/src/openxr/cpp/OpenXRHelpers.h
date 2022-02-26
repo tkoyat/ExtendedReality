@@ -1,22 +1,10 @@
 #pragma once
 
-#include <EGL/egl.h>
-#include "jni.h"
-#include <openxr/openxr.h>
-#include <openxr/openxr.h>
-#include <openxr/openxr_platform.h>
+#include <string>
 #include <openxr/openxr_reflection.h>
 #include "vrb/Matrix.h"
 
-#include <string>
-
 namespace crow {
-
-#if defined(HVR)
-  const vrb::Vector kAverageHeight(0.0f, 1.6f, 0.0f);
-#else
-  const vrb::Vector kAverageHeight(0.0f, 1.7f, 0.0f);
-#endif
 
 inline std::string Fmt(const char* fmt, ...) {
     va_list vl;
@@ -102,27 +90,9 @@ inline XrResult CheckXrResult(XrResult res, const char* originator = nullptr, co
     return res;
 }
 
-inline XrResult MessageXrResult(XrResult res, const char* originator = nullptr, const char* sourceLocation = nullptr) {
-    if (XR_FAILED(res)) {
-        VRB_ERROR("XrResult failure [%s] %s %s", to_string(res), originator, sourceLocation);
-    }
-
-    return res;
-}
-
 #define THROW_XR(xr, cmd) ThrowXrResult(xr, #cmd, FILE_AND_LINE);
 #define CHECK_XRCMD(cmd) CheckXrResult(cmd, #cmd, FILE_AND_LINE);
 #define CHECK_XRRESULT(res, cmdStr) CheckXrResult(res, cmdStr, FILE_AND_LINE);
-#define XRCMD(cmd) MessageXrResult(cmd, #cmd, FILE_AND_LINE);
-
-#define RETURN_IF_XR_FAILED(cmd, ...)                                                                            \
-    {                                                                                                            \
-        auto res = cmd;                                                                                          \
-        if (XR_FAILED(res)) {                                                                                    \
-            VRB_ERROR("XrResult failure [%s] %s: %d", to_string(res), __FILE__, __LINE__);                       \
-            return res;                                                                                          \
-        }                                                                                                        \
-    }
 
 
 inline XrPosef XrPoseIdentity() {
@@ -140,10 +110,9 @@ inline vrb::Matrix XrPoseToMatrix(const XrPosef& aPose) {
 inline XrPosef MatrixToXrPose(const vrb::Matrix& aMatrix) {
     vrb::Quaternion q;
     q.SetFromRotationMatrix(aMatrix);
-    q = q.Normalize();
     vrb::Vector p = aMatrix.GetTranslation();
     XrPosef result;
-    result.orientation = XrQuaternionf{-q.x(), -q.y(), -q.z(), q.w()};
+    result.orientation = XrQuaternionf{q.x(), q.y(), q.z(), q.w()};
     result.position = XrVector3f{p.x(), p.y(), p.z()};
     return result;
 }

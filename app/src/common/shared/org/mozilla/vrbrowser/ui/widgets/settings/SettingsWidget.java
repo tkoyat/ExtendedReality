@@ -27,7 +27,6 @@ import androidx.annotation.Nullable;
 import androidx.databinding.DataBindingUtil;
 import androidx.lifecycle.ViewModelProvider;
 
-import org.jetbrains.annotations.NotNull;
 import org.mozilla.vrbrowser.BuildConfig;
 import org.mozilla.vrbrowser.R;
 import org.mozilla.vrbrowser.VRBrowserActivity;
@@ -54,7 +53,6 @@ import java.util.concurrent.Executor;
 import mozilla.components.Build;
 import mozilla.components.concept.storage.Login;
 import mozilla.components.concept.sync.AccountObserver;
-import mozilla.components.concept.sync.AuthFlowError;
 import mozilla.components.concept.sync.AuthType;
 import mozilla.components.concept.sync.OAuthAccount;
 import mozilla.components.concept.sync.Profile;
@@ -78,10 +76,9 @@ public class SettingsWidget extends UIDialog implements SettingsView.Delegate {
 
         @Override
         public boolean onDown (MotionEvent e) {
-//            mBinding.buildText.setText(mIsHash ?
-//                    StringUtils.versionCodeToDate(getContext(), BuildConfig.VERSION_CODE) :
-//                    BuildConfig.GIT_HASH + " (AC " + Build.version + ")");
-            mBinding.buildText.setText(StringUtils.versionCodeToDate(getContext(), BuildConfig.VERSION_CODE));
+            mBinding.buildText.setText(mIsHash ?
+                    StringUtils.versionCodeToDate(getContext(), BuildConfig.VERSION_CODE) :
+                    BuildConfig.GIT_HASH + " (AC " + Build.version + ")");
 
             mIsHash = !mIsHash;
 
@@ -355,11 +352,6 @@ public class SettingsWidget extends UIDialog implements SettingsView.Delegate {
 
         @Override
         public void onAuthenticationProblems() {
-            post(() -> mBinding.fxaButton.setText(R.string.settings_fxa_account_reconnect));
-        }
-
-        @Override
-        public void onFlowError(@NotNull AuthFlowError authFlowError) {
             post(() -> mBinding.fxaButton.setText(R.string.settings_fxa_account_reconnect));
         }
     };

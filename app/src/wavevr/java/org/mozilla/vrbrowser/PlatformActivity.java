@@ -29,7 +29,9 @@ public class PlatformActivity extends VRActivity {
         return true;
     }
 
-    public PlatformActivity() {}
+    public PlatformActivity() {
+        super.setUsingRenderBaseActivity(true);
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {

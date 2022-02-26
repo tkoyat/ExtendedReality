@@ -213,7 +213,7 @@ struct BrowserWorld::State {
     //rootTransparent->AddLight(light);
     cullVisitor = CullVisitor::Create(create);
     drawList = DrawableList::Create(create);
-    controllers = ControllerContainer::Create(create, rootTransparent, loader);
+    controllers = ControllerContainer::Create(create, rootTransparent);
     externalVR = ExternalVR::Create();
     blitter = ExternalBlitter::Create(create);
     fadeAnimation = FadeAnimation::Create(create);
@@ -861,30 +861,19 @@ BrowserWorld::InitializeJava(JNIEnv* aEnv, jobject& aActivity, jobject& aAssetMa
   VRBrowser::SetDeviceType(m.device->GetDeviceType());
 
   if (!m.modelsLoaded) {
-    m.device->OnControllersReady([this](){
-      const int32_t modelCount = m.device->GetControllerModelCount();
-      for (int32_t index = 0; index < modelCount; index++) {
-        vrb::LoadTask task = m.device->GetControllerModelTask(index);
-        if (task) {
-          // If there is a task we set the task to lazy load the models when the controller is created
-          // (In some platforms if the controller is not available the SDK doesn't return the model so
-          // we need to do the model load right when the controller becomes available)
-          m.controllers->SetControllerModelTask(index, task);
-          m.controllers->LoadControllerModel(index);
-        } else {
-          const std::string fileName = m.device->GetControllerModelName(index);
-          if (!fileName.empty()) {
-            m.controllers->LoadControllerModel(index, m.loader, fileName);
-          }
-        }
+    const int32_t modelCount = m.device->GetControllerModelCount();
+    for (int32_t index = 0; index < modelCount; index++) {
+      const std::string fileName = m.device->GetControllerModelName(index);
+      if (!fileName.empty()) {
+        m.controllers->LoadControllerModel(index, m.loader, fileName);
       }
-      m.controllers->InitializeBeam();
-      m.controllers->SetPointerColor(vrb::Color(VRBrowser::GetPointerColor()));
-      m.rootController->AddNode(m.controllers->GetRoot());
-      if (m.device->IsControllerLightEnabled()) {
-        m.rootController->AddLight(m.light);
-      }
-    });
+    }
+    m.controllers->InitializeBeam();
+    m.controllers->SetPointerColor(vrb::Color(VRBrowser::GetPointerColor()));
+    m.rootController->AddNode(m.controllers->GetRoot());
+    if (m.device->IsControllerLightEnabled()) {
+      m.rootController->AddLight(m.light);
+    }
 
     UpdateEnvironment();
 
@@ -1690,14 +1679,7 @@ BrowserWorld::CreateSkyBox(const std::string& aBasePath, const std::string& aExt
     return;
   }
   const std::string extension = aExtension.empty() ? ".ktx" : aExtension;
-  GLenum glFormat = GL_RGBA8;
-  if (extension == ".ktx") {
-#if defined(OPENXR) && defined(OCULUSVR)
-    glFormat =  GL_COMPRESSED_SRGB8_ETC2;
-#else
-    glFormat =  GL_COMPRESSED_RGB8_ETC2;
-#endif
-  }
+  const GLenum glFormat = extension == ".ktx" ? GL_COMPRESSED_RGB8_ETC2 : GL_RGBA8;
   const int32_t size = 1024;
   if (m.skybox) {
     m.skybox->SetVisible(true);
@@ -1716,22 +1698,22 @@ BrowserWorld::CreateSkyBox(const std::string& aBasePath, const std::string& aExt
   }
 }
 
-void BrowserWorld::CreateEnvironment() {
-  ASSERT_ON_RENDER_THREAD();
-  m.rootEnvironment = Transform::Create(m.create);
-  m.rootEnvironment->AddLight(Light::Create(m.create));
-
-  vrb::TransformPtr model = Transform::Create(m.create);
-  m.loader->LoadModel("FirefoxPlatform2_low.obj", model);
-  m.rootEnvironment->AddNode(model);
-  vrb::Matrix transform = vrb::Matrix::Identity();
-  model->SetTransform(transform);
-
-  m.layerEnvironment = m.device->CreateLayerProjection(VRLayerSurface::SurfaceType::FBO);
-  if (m.layerEnvironment) {
-    m.rootEnvironment->AddNode(VRLayerNode::Create(m.create, m.layerEnvironment));
-  }
-}
+//void BrowserWorld::CreateEnvironment() {
+//  ASSERT_ON_RENDER_THREAD();
+//  m.rootEnvironment = Transform::Create(m.create);
+//  m.rootEnvironment->AddLight(Light::Create(m.create));
+//
+//  vrb::TransformPtr model = Transform::Create(m.create);
+//  m.loader->LoadModel("FirefoxPlatform2_low.obj", model);
+//  m.rootEnvironment->AddNode(model);
+//  vrb::Matrix transform = vrb::Matrix::Identity();
+//  model->SetTransform(transform);
+//
+//  m.layerEnvironment = m.device->CreateLayerProjection(VRLayerSurface::SurfaceType::FBO);
+//  if (m.layerEnvironment) {
+//    m.rootEnvironment->AddNode(VRLayerNode::Create(m.create, m.layerEnvironment));
+//  }
+//}
 
 } // namespace crow
 

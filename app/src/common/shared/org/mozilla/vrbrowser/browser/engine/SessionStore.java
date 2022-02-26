@@ -8,11 +8,9 @@ import android.util.Pair;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
-import org.mozilla.geckoview.GeckoResult;
 import org.mozilla.geckoview.GeckoRuntime;
 import org.mozilla.geckoview.GeckoSession;
 import org.mozilla.vrbrowser.BuildConfig;
-import org.mozilla.vrbrowser.R;
 import org.mozilla.vrbrowser.VRBrowserApplication;
 import org.mozilla.vrbrowser.browser.BookmarksStore;
 import org.mozilla.vrbrowser.browser.HistoryStore;
@@ -51,8 +49,7 @@ public class SessionStore implements
     private static final int MAX_GECKO_SESSIONS = 5;
 
     private static final List<Pair<String, String>> BUILTIN_WEB_EXTENSIONS = Arrays.asList(
-            new Pair<>("fxr-webcompat_youtube@mozilla.org", "resource://android/assets/extensions/fxr_youtube/"),
-            new Pair<>("fxr-webcompat_mediasession@mozilla.org", "resource://android/assets/extensions/fxr_mediasession/")
+            new Pair<>("fxr-webcompat_youtube@mozilla.org", "resource://android/assets/extensions/fxr_youtube/")
     );
 
     private static SessionStore mInstance;
@@ -81,6 +78,11 @@ public class SessionStore implements
 
     private SessionStore() {
         mSessions = new ArrayList<>();
+    }
+
+    public static void prefOverrides(Context context) {
+        // FIXME: Once GeckoView has a prefs API
+        SessionUtils.vrPrefsWorkAround(context);
     }
 
     public void initialize(Context context) {
@@ -125,7 +127,7 @@ public class SessionStore implements
         // Web Extensions initialization
         BUILTIN_WEB_EXTENSIONS.forEach(extension -> BuiltinExtension.install(mWebExtensionRuntime, extension.first, extension.second));
         WebCompatFeature.INSTANCE.install(mWebExtensionRuntime);
-        WebCompatReporterFeature.INSTANCE.install(mWebExtensionRuntime, context.getString(R.string.app_name));
+        WebCompatReporterFeature.INSTANCE.install(mWebExtensionRuntime);
         mWebChannelsFeature = new FxaWebChannelFeature(
                 mContext,
                 null,
@@ -467,11 +469,10 @@ public class SessionStore implements
     }
 
     @Override
-    public GeckoResult<Integer> onContentPermissionRequest(@NonNull GeckoSession session, @NonNull ContentPermission perm) {
+    public void onContentPermissionRequest(@NonNull GeckoSession session, @Nullable String uri, int type, @NonNull Callback callback) {
         if (mPermissionDelegate != null) {
-            return mPermissionDelegate.onContentPermissionRequest(session, perm);
+            mPermissionDelegate.onContentPermissionRequest(session, uri, type, callback);
         }
-        return GeckoResult.fromValue(ContentPermission.VALUE_DENY);
     }
 
     @Override

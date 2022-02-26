@@ -78,6 +78,7 @@ public class TrayWidget extends UIWidget implements WidgetManagerDelegate.Update
     private TrayBinding mBinding;
     private AudioEngine mAudio;
     private SettingsWidget mSettingsWidget;
+//    private SeeThroughWidget mSeeThroughWidget;
     private List<TrayListener> mTrayListeners;
     private int mMinPadding;
     private int mMaxPadding;
@@ -637,6 +638,24 @@ public class TrayWidget extends UIWidget implements WidgetManagerDelegate.Update
         mSettingsWidget.show(REQUEST_FOCUS, settingDialog);
     }
 
+//    public void toggleSeeThroughWidget() {
+//        if(mSeeThroughWidget ==null)
+//        {
+//            mSeeThroughWidget = new SeeThroughWidget(getContext());
+//        }
+//        mSeeThroughWidget.attachToWindow(mAttachedWindow);
+//
+//        if(mSeeThroughWidget.isVisible())
+//        {
+//            mSeeThroughWidget.hide(KEEP_WIDGET);
+//
+//        } else
+//
+//        {
+//            mSeeThroughWidget.show(REQUEST_FOCUS);
+//        }
+//    }
+
     public void setAddWindowVisible(boolean aVisible) {
         mTrayViewModel.setIsMaxWindows(!aVisible);
     }
@@ -770,6 +789,7 @@ public class TrayWidget extends UIWidget implements WidgetManagerDelegate.Update
 
     private void updateWifi() {
         if ((mTrayViewModel.getWifiConnected().getValue() != null) && mTrayViewModel.getWifiConnected().getValue().get()) {
+            // Update Wifi
             WifiManager wifiManager = (WifiManager) getContext().getSystemService(Context.WIFI_SERVICE);
             if (wifiManager != null) {
                 WifiInfo wifiInfo = wifiManager.getConnectionInfo();

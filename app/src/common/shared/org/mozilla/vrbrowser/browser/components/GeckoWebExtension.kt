@@ -299,9 +299,9 @@ class GeckoWebExtension(
                                 tabDetails.active == true,
                                 tabDetails.url)
                 ) {
-                    GeckoResult.allow()
+                    GeckoResult.ALLOW
                 } else {
-                    GeckoResult.deny()
+                    GeckoResult.DENY
                 }
             }
 
@@ -312,12 +312,12 @@ class GeckoWebExtension(
 
                 return if (ext != null) {
                     if (tabHandler.onCloseTab(this@GeckoWebExtension, session)) {
-                        GeckoResult.allow()
+                        GeckoResult.ALLOW
                     } else {
-                        GeckoResult.deny()
+                        GeckoResult.DENY
                     }
                 } else {
-                    GeckoResult.deny()
+                    GeckoResult.DENY
                 }
             }
         }
@@ -337,8 +337,8 @@ class GeckoWebExtension(
     /**
      * See [WebExtension.getMetadata].
      */
-    override fun getMetadata(): Metadata {
-        return nativeExtension.metaData.let {
+    override fun getMetadata(): Metadata? {
+        return nativeExtension.metaData?.let {
             Metadata(
                     name = it.name,
                     description = it.description,
@@ -362,15 +362,11 @@ class GeckoWebExtension(
     }
 
     override fun isEnabled(): Boolean {
-        return nativeExtension.metaData.enabled
-    }
-
-    override suspend fun loadIcon(size: Int): Bitmap? {
-        return this.nativeExtension.metaData.icon.getBitmap(size).await()
+        return nativeExtension.metaData?.enabled ?: true
     }
 
     override fun isAllowedInPrivateBrowsing(): Boolean {
-        return isBuiltIn() || nativeExtension.metaData.allowedInPrivateBrowsing
+        return isBuiltIn() || nativeExtension.metaData?.allowedInPrivateBrowsing ?: false
     }
 }
 
@@ -401,7 +397,7 @@ class GeckoPort(
 
 private fun GeckoNativeWebExtensionAction.convert(): Action {
     val loadIcon: (suspend (Int) -> Bitmap?)? = icon?.let {
-        { size -> icon?.getBitmap(size)?.await() }
+        { size -> icon?.get(size)?.await() }
     }
 
     val onClick = { click() }

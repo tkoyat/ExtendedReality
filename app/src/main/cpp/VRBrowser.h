@@ -17,7 +17,6 @@ namespace crow {
 
 namespace VRBrowser {
 void InitializeJava(JNIEnv* aEnv, jobject aActivity);
-JNIEnv * Env();
 void ShutdownJava();
 void DispatchCreateWidget(jint aWidgetHandle, jobject aSurfaceTexture, jint aWidth, jint aHeight);
 void DispatchCreateWidgetLayer(jint aWidgetHandle, jobject aSurface, jint aWidth, jint aHeight, const std::function<void()>& aFirstCompositeCallback);

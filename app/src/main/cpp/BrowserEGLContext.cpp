@@ -6,10 +6,7 @@
 #include "BrowserEGLContext.h"
 #include "vrb/Logger.h"
 #include <EGL/eglext.h>
-
-#ifndef HVR
 #include <android_native_app_glue.h>
-#endif
 
 namespace crow {
 
@@ -48,11 +45,7 @@ BrowserEGLContext::Initialize(ANativeWindow *aNativeWindow) {
           EGL_GREEN_SIZE, 8,
           EGL_BLUE_SIZE, 8,
           EGL_ALPHA_SIZE, 8,
-#ifdef HVR
-          EGL_DEPTH_SIZE, 24,
-#else
           EGL_DEPTH_SIZE, 0,
-#endif
           EGL_STENCIL_SIZE, 0,
           EGL_SAMPLES, 0,
           EGL_NONE
@@ -92,14 +85,12 @@ BrowserEGLContext::Initialize(ANativeWindow *aNativeWindow) {
     return false;
   }
 
-  mNativeWindow = aNativeWindow;
 
-#ifndef HVR
   //Reconfigure the ANativeWindow buffers to match, using EGL_NATIVE_VISUAL_ID.
+  mNativeWindow = aNativeWindow;
   EGLint format;
   eglGetConfigAttrib(mDisplay, mConfig, EGL_NATIVE_VISUAL_ID, &format);
   ANativeWindow_setBuffersGeometry(aNativeWindow, 0, 0, format);
-#endif
 
   EGLint contextAttribs[] = {
           EGL_CONTEXT_CLIENT_VERSION, 3,
@@ -118,12 +109,7 @@ BrowserEGLContext::Initialize(ANativeWindow *aNativeWindow) {
   		EGL_NONE
   };
 
-#ifdef HVR
-  const EGLint attribs[] = { EGL_NONE };
-  mSurface = eglCreateWindowSurface(mDisplay, mConfig, mNativeWindow, attribs);
-#else
   mSurface = eglCreatePbufferSurface(mDisplay, mConfig, surfaceAttribs);
-#endif
 
   if (mSurface == EGL_NO_SURFACE) {
     VRB_ERROR("eglCreateWindowSurface() failed: %s", ErrorToString(eglGetError()));
@@ -173,11 +159,6 @@ BrowserEGLContext::Destroy() {
 void
 BrowserEGLContext::UpdateNativeWindow(ANativeWindow *aWindow) {
   mNativeWindow = aWindow;
-
-#ifdef HVR
-  const EGLint attribs[] = { EGL_NONE };
-  mSurface = eglCreateWindowSurface(mDisplay, mConfig, mNativeWindow, attribs);
-#endif
 }
 
 bool

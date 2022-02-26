@@ -38,8 +38,6 @@ struct ControllerContainer::State {
   int gazeIndex = -1;
   uint64_t immersiveFrameId;
   uint64_t lastImmersiveFrameId;
-  ModelLoaderAndroidPtr loader;
-  std::vector<vrb::LoadTask> loadTask;
 
   void Initialize(vrb::CreationContextPtr& aContext) {
     context = aContext;
@@ -88,10 +86,9 @@ struct ControllerContainer::State {
 };
 
 ControllerContainerPtr
-ControllerContainer::Create(vrb::CreationContextPtr& aContext, const vrb::GroupPtr& aPointerContainer, const ModelLoaderAndroidPtr& aLoader) {
+ControllerContainer::Create(vrb::CreationContextPtr& aContext, const vrb::GroupPtr& aPointerContainer) {
   auto result = std::make_shared<vrb::ConcreteClass<ControllerContainer, ControllerContainer::State> >(aContext);
   result->m.pointerContainer = aPointerContainer;
-  result->m.loader = aLoader;
   return result;
 }
 
@@ -104,21 +101,6 @@ void
 ControllerContainer::LoadControllerModel(const int32_t aModelIndex, const ModelLoaderAndroidPtr& aLoader, const std::string& aFileName) {
   m.SetUpModelsGroup(aModelIndex);
   aLoader->LoadModel(aFileName, m.models[aModelIndex]);
-}
-
-void
-ControllerContainer::LoadControllerModel(const int32_t aModelIndex) {
-  m.SetUpModelsGroup(aModelIndex);
-  if (m.loadTask[aModelIndex]) {
-    m.loader->LoadModel(m.loadTask[aModelIndex], m.models[aModelIndex]);
-  } else {
-    VRB_ERROR("No model load task fork model: %d", aModelIndex)
-  }
-}
-
-void ControllerContainer::SetControllerModelTask(const int32_t aModelIndex, const vrb::LoadTask& aTask) {
-  m.SetUpModelsGroup(aModelIndex);
-  m.loadTask.resize(aModelIndex + 1, aTask);
 }
 
 void
@@ -235,28 +217,25 @@ ControllerContainer::CreateController(const int32_t aControllerIndex, const int3
   controller.transform = Transform::Create(create);
   controller.pointer = Pointer::Create(create);
   controller.pointer->SetVisible(true);
-
   if (aControllerIndex != m.gazeIndex) {
     if ((m.models.size() >= aModelIndex) && m.models[aModelIndex]) {
       controller.transform->AddNode(m.models[aModelIndex]);
       controller.beamToggle = vrb::Toggle::Create(create);
       controller.beamToggle->ToggleAll(true);
-      vrb::TransformPtr beamTransform = Transform::Create(create);
-      beamTransform->SetTransform(aBeamTransform);
-      controller.beamParent = beamTransform;
-      controller.beamToggle->AddNode(beamTransform);
+      if (aBeamTransform.IsIdentity()) {
+        controller.beamParent = controller.beamToggle;
+      } else {
+        vrb::TransformPtr beamTransform = Transform::Create(create);
+        beamTransform->SetTransform(aBeamTransform);
+        controller.beamParent = beamTransform;
+        controller.beamToggle->AddNode(beamTransform);
+      }
       controller.transform->AddNode(controller.beamToggle);
       if (m.beamModel && controller.beamParent) {
         controller.beamParent->AddNode(m.beamModel);
       }
-
-      // If the model is not yet loaded we trigger the load task
-      if (m.models[aModelIndex]->GetNodeCount() == 0  &&
-          m.loadTask.size() > aControllerIndex + 1 && m.loadTask[aModelIndex]) {
-        m.loader->LoadModel(m.loadTask[aModelIndex], m.models[aModelIndex]);
-      }
     } else {
-      VRB_ERROR("Failed to add controller model")
+      VRB_ERROR("Failed to add controller model");
     }
   }
 
@@ -277,17 +256,6 @@ ControllerContainer::SetImmersiveBeamTransform(const int32_t aControllerIndex,
     return;
   }
   m.list[aControllerIndex].immersiveBeamTransform = aImmersiveBeamTransform;
-}
-
-void
-ControllerContainer::SetBeamTransform(const int32_t aControllerIndex, const vrb::Matrix& aBeamTransform) {
-  if (!m.Contains(aControllerIndex)) {
-    return;
-  }
-  if (m.list[aControllerIndex].beamParent) {
-    m.list[aControllerIndex].beamParent->SetTransform(aBeamTransform);
-  }
-  m.list[aControllerIndex].beamTransformMatrix = aBeamTransform;
 }
 
 void

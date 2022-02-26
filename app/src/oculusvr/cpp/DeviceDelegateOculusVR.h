@@ -9,7 +9,6 @@
 #include "vrb/Forward.h"
 #include "vrb/MacroUtils.h"
 #include "DeviceDelegate.h"
-#include "JNIUtil.h"
 #include <memory>
 
 class android_app;
@@ -22,7 +21,7 @@ typedef std::shared_ptr<DeviceDelegateOculusVR> DeviceDelegateOculusVRPtr;
 
 class DeviceDelegateOculusVR : public DeviceDelegate {
 public:
-  static DeviceDelegateOculusVRPtr Create(vrb::RenderContextPtr& aContext, JavaContext* aJavaContext);
+  static DeviceDelegateOculusVRPtr Create(vrb::RenderContextPtr& aContext, android_app* aApp);
   // DeviceDelegate interface
   device::DeviceType GetDeviceType() override;
   void SetRenderMode(const device::RenderMode aMode) override;

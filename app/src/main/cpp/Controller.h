@@ -40,7 +40,7 @@ struct Controller {
   float scrollDeltaY;
   vrb::TransformPtr transform;
   vrb::TogglePtr beamToggle;
-  vrb::TransformPtr beamParent;
+  vrb::GroupPtr beamParent;
   PointerPtr pointer;
   vrb::Matrix transformMatrix;
   vrb::Matrix beamTransformMatrix;

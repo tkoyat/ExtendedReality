@@ -14,7 +14,6 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.databinding.DataBindingUtil;
 
-import org.jetbrains.annotations.NotNull;
 import org.mozilla.vrbrowser.R;
 import org.mozilla.vrbrowser.VRBrowserApplication;
 import org.mozilla.vrbrowser.browser.Accounts;
@@ -30,7 +29,6 @@ import java.util.Objects;
 import java.util.concurrent.Executor;
 
 import mozilla.components.concept.sync.AccountObserver;
-import mozilla.components.concept.sync.AuthFlowError;
 import mozilla.components.concept.sync.AuthType;
 import mozilla.components.concept.sync.OAuthAccount;
 import mozilla.components.concept.sync.Profile;
@@ -244,11 +242,6 @@ class FxAAccountOptionsView extends SettingsView {
 
         @Override
         public void onAuthenticationProblems() {
-            post(FxAAccountOptionsView.this::onDismiss);
-        }
-
-        @Override
-        public void onFlowError(@NotNull AuthFlowError authFlowError) {
             post(FxAAccountOptionsView.this::onDismiss);
         }
     };

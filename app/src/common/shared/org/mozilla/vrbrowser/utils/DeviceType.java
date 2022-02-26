@@ -8,7 +8,7 @@ import org.mozilla.vrbrowser.BuildConfig;
 
 public class DeviceType {
     // These values need to match those in Device.h
-    @IntDef(value = { Unknown, OculusGo, OculusQuest, ViveFocus, ViveFocusPlus, PicoNeo2, PicoG2, PicoNeo3 })
+    @IntDef(value = { Unknown, OculusGo, OculusQuest, ViveFocus, ViveFocusPlus, PicoNeo2, PicoG2 })
     public @interface Type {}
     public static final int Unknown = 0;
     public static final int OculusGo = 1;
@@ -17,7 +17,6 @@ public class DeviceType {
     public static final int ViveFocusPlus = 4;
     public static final int PicoNeo2 = 6;
     public static final int PicoG2 = 7;
-    public static final int PicoNeo3 = 8;
 
     private static @Type int mType = Unknown;
 
@@ -38,9 +37,6 @@ public class DeviceType {
                 break;
             case PicoNeo2:
                 name = "Pico Neo 2";
-                break;
-            case PicoNeo3:
-                name = "Pico Neo 3";
                 break;
             case PicoG2:
                 name = "Pico G2";
@@ -65,10 +61,6 @@ public class DeviceType {
 
     public static boolean isWaveBuild() {
         return BuildConfig.FLAVOR_platform.toLowerCase().contains("wavevr");
-    }
-
-    public static boolean isHVRBuild() {
-        return BuildConfig.FLAVOR_platform.toLowerCase().contains("hvr");
     }
 
     public static boolean isPicoVR() {

@@ -18,7 +18,6 @@
 #include "vrb/RenderContext.h"
 #include "vrb/Vector.h"
 #include "vrb/Quaternion.h"
-#include "Device.h"
 
 #include <array>
 #include <vector>
@@ -43,10 +42,6 @@ static const int32_t kButtonTouchPad  = 1 << 2;
 static const int32_t kButtonAX        = 1 << 3;
 static const int32_t kButtonBY        = 1 << 4;
 static const int32_t kButtonGrip      = 1 << 5;
-
-bool is6DoFHeadset(device::DeviceType type) {
-  return type != device::PicoG2;
-}
 
 struct DeviceDelegatePicoVR::State {
   struct Controller {
@@ -80,7 +75,7 @@ struct DeviceDelegatePicoVR::State {
   vrb::RenderContextWeak context;
   bool initialized = false;
   bool paused = false;
-  device::DeviceType type = device::UnknownType;
+  int32_t type = 0;
   device::RenderMode renderMode = device::RenderMode::StandAlone;
   bool setHeadOffset = true;
   vrb::Vector headOffset;
@@ -190,7 +185,7 @@ struct DeviceDelegatePicoVR::State {
 
       controllerDelegate->SetButtonState(i, ControllerDelegate::BUTTON_APP, -1, appPressed,
                                          appPressed);
-      controllerDelegate->SetButtonState(i, ControllerDelegate::BUTTON_TOUCHPAD, is6DoFHeadset(type) ?
+      controllerDelegate->SetButtonState(i, ControllerDelegate::BUTTON_TOUCHPAD, type == k6DofHeadSet ?
           device::kImmersiveButtonThumbstick : device::kImmersiveButtonTouchpad, touchPadPressed, touchPadPressed);
       controllerDelegate->SetButtonState(i, ControllerDelegate::BUTTON_TRIGGER, device::kImmersiveButtonTrigger, triggerPressed,
                                          triggerPressed);
@@ -199,7 +194,7 @@ struct DeviceDelegatePicoVR::State {
       } else {
         controllerDelegate->SetSelectActionStop(i);
       }
-      if (is6DoFHeadset(type)) {
+      if (type == k6DofHeadSet) {
         controllerDelegate->SetButtonState(i, ControllerDelegate::BUTTON_SQUEEZE, device::kImmersiveButtonSqueeze, gripPressed,
                                            gripPressed, gripPressed ? 20.0f : 0.0f);
         if (gripPressed && renderMode == device::RenderMode::Immersive) {
@@ -246,7 +241,7 @@ struct DeviceDelegatePicoVR::State {
       vrb::Matrix transform = controller.transform;
       if (i != gazeIndex) {
           if (renderMode == device::RenderMode::StandAlone) {
-              if (is6DoFHeadset(type)) {
+              if (type == k6DofHeadSet) {
                   transform.TranslateInPlace(headOffset);
               } else {
                   vrb::Matrix head = vrb::Matrix::Rotation(orientation);
@@ -254,7 +249,7 @@ struct DeviceDelegatePicoVR::State {
                   transform = elbow->GetTransform(controller.hand, head, transform);
               }
           }
-          else if (!is6DoFHeadset(type)) {
+          else if (type != k6DofHeadSet) {
               vrb::Matrix head = vrb::Matrix::Rotation(orientation);
               transform = elbow->GetTransform(controller.hand, head, transform);
           }
@@ -283,10 +278,6 @@ DeviceDelegatePicoVR::Create(vrb::RenderContextPtr& aContext) {
   return result;
 }
 
-device::DeviceType
-DeviceDelegatePicoVR::GetDeviceType() {
-  return m.type;
-}
 
 void
 DeviceDelegatePicoVR::SetRenderMode(const device::RenderMode aMode) {
@@ -316,7 +307,7 @@ DeviceDelegatePicoVR::RegisterImmersiveDisplay(ImmersiveDisplayPtr aDisplay) {
   m.immersiveDisplay->SetDeviceName("Pico");
   device::CapabilityFlags flags = device::Orientation | device::Present |
           device::ImmersiveVRSession | device::InlineSession;
-  if (is6DoFHeadset(m.type)) {
+  if (m.type == k6DofHeadSet) {
     flags |= device::Position | device::StageParameters;
     m.immersiveDisplay->SetSittingToStandingTransform(vrb::Matrix::Translation(kAverageSittingToStanding));
   } else {
@@ -377,7 +368,7 @@ DeviceDelegatePicoVR::SetControllerDelegate(ControllerDelegatePtr& aController) 
       m.controllerDelegate->SetControllerType(index, device::PicoGaze);
       m.controllerDelegate->SetTargetRayMode(index, device::TargetRayMode::Gaze);
     } else {
-      if (is6DoFHeadset(m.type)) {
+      if (m.type == k6DofHeadSet) {
         vrb::Matrix beam = vrb::Matrix::Rotation(vrb::Vector(1.0f, 0.0f, 0.0f), -vrb::PI_FLOAT / 11.5f);
         beam.TranslateInPlace(vrb::Vector(0.0f, 0.012f, -0.06f));
         m.controllerDelegate->CreateController(index, int32_t(controller.hand), controller.IsRightHand() ? "Pico Neo 2 (Right)" : "Pico Neo 2 (Left)", beam);
@@ -405,19 +396,12 @@ DeviceDelegatePicoVR::ReleaseControllerDelegate() {
 
 int32_t
 DeviceDelegatePicoVR::GetControllerModelCount() const {
-  return is6DoFHeadset(m.type) ? 2 : 1;
+  return m.type == k6DofHeadSet ? 2 : 1;
 }
 
 const std::string
 DeviceDelegatePicoVR::GetControllerModelName(const int32_t aModelIndex) const {
-  if (m.type == device::PicoNeo3) {
-    if (aModelIndex == 0) {
-      return "neo3_left.obj";
-    } else if (aModelIndex == 1) {
-      return "neo3_right.obj";
-    }
-    return "";
-  } else if (m.type == device::PicoNeo2) {
+  if (m.type == k6DofHeadSet) {
     if (aModelIndex == 0) {
       return "neo2_left.obj";
     } else if (aModelIndex == 1) {
@@ -441,7 +425,7 @@ DeviceDelegatePicoVR::StartFrame(const FramePrediction aPrediction) {
 
   if (m.renderMode == device::RenderMode::StandAlone) {
     if (m.recentered) {
-      if (is6DoFHeadset(m.type)) {
+      if (m.type == k6DofHeadSet) {
         m.reorientMatrix = DeviceUtils::CalculateReorientationMatrix(head, kAverageHeight);
       } else {
         m.reorientMatrix = vrb::Matrix::Identity();

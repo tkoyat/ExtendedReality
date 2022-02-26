@@ -10,6 +10,7 @@
 #include "VRBrowser.h"
 #include "VRLayer.h"
 
+#include <android_native_app_glue.h>
 #include <EGL/egl.h>
 #include "vrb/CameraEye.h"
 #include "vrb/Color.h"
@@ -42,9 +43,11 @@
 
 namespace crow {
 
+const vrb::Vector kAverageHeight(0.0f, 1.7f, 0.0f);
+
 struct DeviceDelegateOpenXR::State {
   vrb::RenderContextWeak context;
-  JavaContext* javaContext = nullptr;
+  android_app* app = nullptr;
   bool layersEnabled = true;
   XrInstanceCreateInfoAndroidKHR java;
   XrInstance instance = XR_NULL_HANDLE;
@@ -58,7 +61,6 @@ struct DeviceDelegateOpenXR::State {
   XrViewConfigurationType viewConfigType{XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO};
   std::vector<XrViewConfigurationView> viewConfig;
   std::vector<XrView> views;
-  std::vector<XrView> prevViews;
   std::vector<OpenXRSwapChainPtr> eyeSwapChains;
   OpenXRSwapChainPtr boundSwapChain;
   OpenXRSwapChainPtr previousBoundSwapchain;
@@ -68,6 +70,7 @@ struct DeviceDelegateOpenXR::State {
   XrSpace stageSpace = XR_NULL_HANDLE;
   std::vector<int64_t> swapchainFormats;
   OpenXRInputPtr input;
+  JNIEnv * jniEnv = nullptr;
   OpenXRLayerCubePtr cubeLayer;
   OpenXRLayerEquirectPtr equirectLayer;
   std::vector<OpenXRLayerPtr> uiLayers;
@@ -93,8 +96,6 @@ struct DeviceDelegateOpenXR::State {
   device::CPULevel minCPULevel = device::CPULevel::Normal;
   device::DeviceType deviceType = device::UnknownType;
   std::vector<const XrCompositionLayerBaseHeader*> frameEndLayers;
-  std::function<void()> controllersReadyCallback;
-  std::optional<XrPosef> firstPose;
 
   void Initialize() {
     vrb::RenderContextPtr localContext = context.lock();
@@ -104,52 +105,31 @@ struct DeviceDelegateOpenXR::State {
     }
     layersEnabled = VRBrowser::AreLayersEnabled();
 
+    (*app->activity->vm).AttachCurrentThread(&jniEnv, NULL);
+    CHECK(jniEnv != nullptr);
+
 #ifdef OCULUSVR
     // Adhoc loader required for OpenXR on Oculus
-    PFN_xrInitializeLoaderKHR initializeLoaderKHR;
-    CHECK_XRCMD(xrGetInstanceProcAddr(nullptr, "xrInitializeLoaderKHR", reinterpret_cast<PFN_xrVoidFunction*>(&initializeLoaderKHR)));
-    XrLoaderInitInfoAndroidKHR loaderData;
+    XrLoaderInitializeInfoAndroidOCULUS loaderData;
     memset(&loaderData, 0, sizeof(loaderData));
-    loaderData.type = XR_TYPE_LOADER_INIT_INFO_ANDROID_KHR;
+    loaderData.type = XR_TYPE_LOADER_INITIALIZE_INFO_ANDROID_OCULUS;
     loaderData.next = nullptr;
-    loaderData.applicationVM = javaContext->vm;
-    loaderData.applicationContext = javaContext->env->NewGlobalRef(javaContext->activity);
-    initializeLoaderKHR(reinterpret_cast<XrLoaderInitInfoBaseHeaderKHR*>(&loaderData));
+    loaderData.applicationVM = app->activity->vm;
+    loaderData.applicationActivity = jniEnv->NewGlobalRef(app->activity->clazz);
+    xrInitializeLoaderOCULUS(&loaderData);
 #endif
 
     // Initialize the XrInstance
-    OpenXRExtensions::Initialize();
-
-    std::vector<const char *> extensions {
-      XR_KHR_ANDROID_CREATE_INSTANCE_EXTENSION_NAME,
-      XR_KHR_OPENGL_ES_ENABLE_EXTENSION_NAME,
-    };
-
-    if (OpenXRExtensions::IsExtensionSupported(XR_KHR_ANDROID_SURFACE_SWAPCHAIN_EXTENSION_NAME)) {
-      extensions.push_back(XR_KHR_ANDROID_SURFACE_SWAPCHAIN_EXTENSION_NAME);
-    }
-    if (OpenXRExtensions::IsExtensionSupported(XR_KHR_COMPOSITION_LAYER_CUBE_EXTENSION_NAME)) {
-      extensions.push_back(XR_KHR_COMPOSITION_LAYER_CUBE_EXTENSION_NAME);
-    }
-    if (OpenXRExtensions::IsExtensionSupported(XR_KHR_COMPOSITION_LAYER_CYLINDER_EXTENSION_NAME)) {
-      extensions.push_back(XR_KHR_COMPOSITION_LAYER_CYLINDER_EXTENSION_NAME);
-    }
-#ifdef OCULUSVR
-    if (OpenXRExtensions::IsExtensionSupported(XR_KHR_COMPOSITION_LAYER_EQUIRECT2_EXTENSION_NAME)) {
-      extensions.push_back(XR_KHR_COMPOSITION_LAYER_EQUIRECT2_EXTENSION_NAME);
-    }
-#endif
-
-
+    std::vector<const char *> extensions = OpenXRExtensions::ExtensionNames();
     java = {XR_TYPE_INSTANCE_CREATE_INFO_ANDROID_KHR};
-    java.applicationVM = javaContext->vm;
-    java.applicationActivity = javaContext->activity;
+    java.applicationVM = app->activity->vm;
+    java.applicationActivity = jniEnv->NewGlobalRef(app->activity->clazz);
 
     XrInstanceCreateInfo createInfo{XR_TYPE_INSTANCE_CREATE_INFO};
     createInfo.next = (XrBaseInStructure*)&java;
     createInfo.enabledExtensionCount = (uint32_t)extensions.size();
     createInfo.enabledExtensionNames = extensions.data();
-    strcpy(createInfo.applicationInfo.applicationName, "Firefox Reality");
+    strcpy(createInfo.applicationInfo.applicationName, "Extended Soul");
     createInfo.applicationInfo.apiVersion = XR_CURRENT_API_VERSION;
 
     CHECK_XRCMD(xrCreateInstance(&createInfo, &instance));
@@ -160,11 +140,11 @@ struct DeviceDelegateOpenXR::State {
     VRB_LOG("OpenXR Instance Created: RuntimeName=%s RuntimeVersion=%s", instanceProperties.runtimeName,
             GetXrVersionString(instanceProperties.runtimeVersion).c_str());
 
-    // Load Extensions
-    OpenXRExtensions::LoadExtensions(instance);
+    // Initialize Extensions
+    OpenXRExtensions::Initialize(instance);
 
     // Initialize System
-    XrSystemGetInfo systemInfo{XR_TYPE_SYSTEM_GET_INFO };
+    XrSystemGetInfo systemInfo{XR_TYPE_SYSTEM_GET_INFO};
     systemInfo.formFactor = XR_FORM_FACTOR_HEAD_MOUNTED_DISPLAY;
     CHECK_XRCMD(xrGetSystem(instance, &systemInfo, &system));
     CHECK_MSG(system != XR_NULL_SYSTEM_ID, "Failed to initialize XRSystem");
@@ -172,6 +152,8 @@ struct DeviceDelegateOpenXR::State {
     // Retrieve system info
     CHECK_XRCMD(xrGetSystemProperties(instance, system, &systemProperties))
     VRB_LOG("OpenXR system name: %s", systemProperties.systemName);
+
+    input = OpenXRInput::Create(instance, systemProperties);
   }
 
   // xrGet*GraphicsRequirementsKHR check must be called prior to xrCreateSession
@@ -244,11 +226,7 @@ struct DeviceDelegateOpenXR::State {
   }
 
   XrSwapchainCreateInfo GetSwapChainCreateInfo(uint32_t w = 0, uint32_t h = 0) {
-#if OCULUSVR
-    const int64_t colorFormat = GL_SRGB8_ALPHA8;
-#else
     const int64_t colorFormat = GL_RGBA8;
-#endif
     CHECK_MSG(SupportsColorFormat(colorFormat), "Runtime doesn't support selected swapChain color format");
 
     CHECK(viewConfig.size() > 0);
@@ -329,7 +307,7 @@ struct DeviceDelegateOpenXR::State {
     }
 
     // Optionally create a stageSpace to be used in WebXR room scale apps.
-    if (stageSpace == XR_NULL_HANDLE && supportsSpace(XR_REFERENCE_SPACE_TYPE_STAGE)) {
+    if (stageSpace == XR_NULL_HANDLE && supportsSpace(XR_REFERENCE_SPACE_TYPE_LOCAL)) {
       XrReferenceSpaceCreateInfo create{XR_TYPE_REFERENCE_SPACE_CREATE_INFO};
       create.poseInReferenceSpace = XrPoseIdentity();
       create.referenceSpaceType = XR_REFERENCE_SPACE_TYPE_STAGE;
@@ -340,7 +318,7 @@ struct DeviceDelegateOpenXR::State {
   void AddUILayer(const OpenXRLayerPtr& aLayer, VRLayerSurface::SurfaceType aSurfaceType) {
     if (session != XR_NULL_HANDLE) {
       vrb::RenderContextPtr ctx = context.lock();
-      aLayer->Init(javaContext->env, session, ctx);
+      aLayer->Init(jniEnv, session, ctx);
     }
     uiLayers.push_back(aLayer);
     if (aSurfaceType == VRLayerSurface::SurfaceType::FBO) {
@@ -381,12 +359,7 @@ struct DeviceDelegateOpenXR::State {
   }
 
   bool Is6DOF() const {
-#if defined(HVR_6DOF)
-    // Workaround for systemProperties.trackingProperties.positionTracking always 0.
-    return true;
-#else
     return systemProperties.trackingProperties.positionTracking != 0;
-#endif
   }
 
   const XrEventDataBaseHeader* PollEvent() {
@@ -405,13 +378,11 @@ struct DeviceDelegateOpenXR::State {
   }
 
   void HandleSessionEvent(const XrEventDataSessionStateChanged& event) {
-    VRB_LOG("OpenXR XrEventDataSessionStateChanged: state %s->%s session=%p time=%ld",
+    VRB_DEBUG("OpenXR XrEventDataSessionStateChanged: state %s->%s session=%p time=%ld",
         to_string(sessionState), to_string(event.state), event.session, event.time);
     sessionState = event.state;
 
-    if (event.session != XR_NULL_HANDLE && session != XR_NULL_HANDLE) {
-      CHECK(session == event.session);
-    }
+    CHECK(session == event.session);
 
     switch (sessionState) {
       case XR_SESSION_STATE_READY: {
@@ -428,7 +399,6 @@ struct DeviceDelegateOpenXR::State {
       }
       case XR_SESSION_STATE_EXITING: {
         vrReady = false;
-        //exit(0);
         break;
       }
       case XR_SESSION_STATE_LOSS_PENDING: {
@@ -473,6 +443,7 @@ struct DeviceDelegateOpenXR::State {
     }
 
     // Release input
+    input->Destroy();
     input = nullptr;
 
     // Shutdown OpenXR instance
@@ -486,10 +457,10 @@ struct DeviceDelegateOpenXR::State {
 };
 
 DeviceDelegateOpenXRPtr
-DeviceDelegateOpenXR::Create(vrb::RenderContextPtr& aContext, JavaContext* aJavaContext) {
+DeviceDelegateOpenXR::Create(vrb::RenderContextPtr& aContext, android_app *aApp) {
   DeviceDelegateOpenXRPtr result = std::make_shared<vrb::ConcreteClass<DeviceDelegateOpenXR, DeviceDelegateOpenXR::State> >();
   result->m.context = aContext;
-  result->m.javaContext = aJavaContext;
+  result->m.app = aApp;
   result->m.Initialize();
   return result;
 }
@@ -583,20 +554,13 @@ DeviceDelegateOpenXR::GetControllerModelName(const int32_t aModelIndex) const {
   return m.input->GetControllerModelName(aModelIndex);
 }
 
-void
-DeviceDelegateOpenXR::OnControllersReady(const std::function<void()>& callback) {
-  if (m.input && m.input->AreControllersReady()) {
-    callback();
-    return;
-  }
-  m.controllersReadyCallback = callback;
-}
 
 void
 DeviceDelegateOpenXR::SetCPULevel(const device::CPULevel aLevel) {
   m.minCPULevel = aLevel;
   m.UpdateClockLevels();
 };
+
 
 void
 DeviceDelegateOpenXR::ProcessEvents() {
@@ -620,19 +584,7 @@ DeviceDelegateOpenXR::ProcessEvents() {
         m.vrReady = false;
         return;
       }
-      case XR_TYPE_EVENT_DATA_INTERACTION_PROFILE_CHANGED: {
-        if (m.input) {
-          m.input->UpdateInteractionProfile();
-          if (m.controllersReadyCallback && m.input->AreControllersReady()) {
-            m.controllersReadyCallback();
-            m.controllersReadyCallback = nullptr;
-          }
-        }
-        break;
-      }
       case XR_TYPE_EVENT_DATA_REFERENCE_SPACE_CHANGE_PENDING:
-        m.firstPose = std::nullopt;
-        break;
       default: {
         VRB_DEBUG("OpenXR ignoring event type %d", ev->type);
         break;
@@ -653,11 +605,6 @@ DeviceDelegateOpenXR::StartFrame(const FramePrediction aPrediction) {
     return;
   }
 
-#if OCULUSVR
-  // Fix brigthness issue.
-  glDisable(GL_FRAMEBUFFER_SRGB_EXT);
-#endif
-
   CHECK(m.session != XR_NULL_HANDLE);
   CHECK(m.viewSpace != XR_NULL_HANDLE);
 
@@ -677,7 +624,6 @@ DeviceDelegateOpenXR::StartFrame(const FramePrediction aPrediction) {
   if (aPrediction == FramePrediction::ONE_FRAME_AHEAD) {
     m.prevPredictedDisplayTime = m.predictedDisplayTime;
     m.prevPredictedPose = m.predictedPose;
-    m.prevViews = m.views;
     m.predictedDisplayTime = frameState.predictedDisplayTime + frameState.predictedDisplayPeriod;
   } else {
     m.predictedDisplayTime = frameState.predictedDisplayTime;
@@ -685,17 +631,10 @@ DeviceDelegateOpenXR::StartFrame(const FramePrediction aPrediction) {
 
   // Query head location
   XrSpaceLocation location {XR_TYPE_SPACE_LOCATION};
-  CHECK_XRCMD(xrLocateSpace(m.viewSpace, m.localSpace, m.predictedDisplayTime, &location));
+  xrLocateSpace(m.viewSpace, m.localSpace, m.predictedDisplayTime, &location);
   m.predictedPose = location.pose;
-  if (!m.firstPose && location.pose.position.y != 0.0) {
-    m.firstPose = location.pose;
-  }
 
   vrb::Matrix head = XrPoseToMatrix(location.pose);
-  #if defined(HVR_6DOF)
-    // Convert from floor to local (HVR doesn't support stageSpace yet)
-    head.TranslateInPlace(vrb::Vector(-m.firstPose->position.x, -m.firstPose->position.y, -m.firstPose->position.z));
-  #endif
 
   if (m.renderMode == device::RenderMode::StandAlone) {
     head.TranslateInPlace(kAverageHeight);
@@ -720,12 +659,6 @@ DeviceDelegateOpenXR::StartFrame(const FramePrediction aPrediction) {
       xrLocateSpace(m.localSpace, m.stageSpace, m.predictedDisplayTime, &stageLocation);
       vrb::Matrix transform = XrPoseToMatrix(stageLocation.pose);
       m.immersiveDisplay->SetSittingToStandingTransform(transform);
-#if HVR_6DOF
-      // Workaround for empty stage transform bug in HVR
-      m.immersiveDisplay->SetSittingToStandingTransform(vrb::Matrix::Translation(vrb::Vector(0.0f, m.firstPose->position.y, 0.0f)));
-#elif HVR
-      m.immersiveDisplay->SetSittingToStandingTransform(vrb::Matrix::Translation(kAverageHeight));
-#endif
     }
   }
 
@@ -734,36 +667,23 @@ DeviceDelegateOpenXR::StartFrame(const FramePrediction aPrediction) {
   uint32_t viewCapacityInput = (uint32_t) m.views.size();
   uint32_t viewCountOutput = 0;
 
-  // Eye transform
-  {
-    XrViewLocateInfo viewLocateInfo{XR_TYPE_VIEW_LOCATE_INFO};
-    viewLocateInfo.viewConfigurationType = m.viewConfigType;
-    viewLocateInfo.displayTime = m.predictedDisplayTime;
-    viewLocateInfo.space = m.viewSpace;
-    CHECK_XRCMD(xrLocateViews(m.session, &viewLocateInfo, &viewState, viewCapacityInput, &viewCountOutput, m.views.data()));
-    for (int i = 0; i < m.views.size(); ++i) {
-      const XrView &view = m.views[i];
-      const device::Eye eye = i == 0 ? device::Eye::Left : device::Eye::Right;
-      m.cameras[i]->SetEyeTransform(XrPoseToMatrix(view.pose));
-      if (m.immersiveDisplay) {
-        m.immersiveDisplay->SetEyeOffset(eye, view.pose.position.x, view.pose.position.y, view.pose.position.z);
-      }
-    }
-  }
-
-  // Perspective
   XrViewLocateInfo viewLocateInfo{XR_TYPE_VIEW_LOCATE_INFO};
   viewLocateInfo.viewConfigurationType = m.viewConfigType;
   viewLocateInfo.displayTime = m.predictedDisplayTime;
-  viewLocateInfo.space = m.localSpace;
+  viewLocateInfo.space = m.viewSpace;
   CHECK_XRCMD(xrLocateViews(m.session, &viewLocateInfo, &viewState, viewCapacityInput, &viewCountOutput, m.views.data()));
 
   for (int i = 0; i < m.views.size(); ++i) {
     const XrView& view = m.views[i];
 
+    vrb::Matrix eyeTransform = XrPoseToMatrix(view.pose);
+    m.cameras[i]->SetEyeTransform(eyeTransform);
+
+
     vrb::Matrix perspective = vrb::Matrix::PerspectiveMatrix(fabsf(view.fov.angleLeft), view.fov.angleRight,
-                                                             view.fov.angleUp, fabsf(view.fov.angleDown), m.near, m.far);
+        view.fov.angleUp, fabsf(view.fov.angleDown), m.near, m.far);
     m.cameras[i]->SetPerspective(perspective);
+
     if (m.immersiveDisplay) {
       const device::Eye eye = i == 0 ? device::Eye::Left : device::Eye::Right;
       auto toDegrees = [](float angle) -> float {
@@ -771,18 +691,13 @@ DeviceDelegateOpenXR::StartFrame(const FramePrediction aPrediction) {
       };
       m.immersiveDisplay->SetFieldOfView(eye, toDegrees(fabsf(view.fov.angleLeft)), toDegrees(view.fov.angleRight),
                                          toDegrees(view.fov.angleUp), toDegrees(fabsf(view.fov.angleDown)));
+      vrb::Vector offset = eyeTransform.GetTranslation();
+      m.immersiveDisplay->SetEyeOffset(eye, offset.x(), offset.y(), offset.z());
     }
   }
 
   // Update controllers
-  if (m.input && m.controller) {
-#if defined(HVR)
-    float offsetY = -m.firstPose->position.y;
-#else
-    float offsetY = 0;
-#endif
-    m.input->Update(frameState, m.localSpace, head, offsetY, m.renderMode, *m.controller);
-  }
+  m.input->Update(m.session, m.predictedDisplayTime, m.localSpace, m.renderMode, m.controller);
 }
 
 void
@@ -824,7 +739,6 @@ DeviceDelegateOpenXR::EndFrame(const FrameEndMode aEndMode) {
   const bool frameAhead = m.framePrediction == FramePrediction::ONE_FRAME_AHEAD;
   const XrPosef& predictedPose = frameAhead ? m.prevPredictedPose : m.predictedPose;
   const XrTime displayTime = frameAhead ? m.prevPredictedDisplayTime : m.predictedDisplayTime;
-  auto& targetViews = frameAhead ? m.prevViews : m.views;
 
   std::vector<const XrCompositionLayerBaseHeader*>& layers = m.frameEndLayers;
   layers.clear();
@@ -866,20 +780,20 @@ DeviceDelegateOpenXR::EndFrame(const FrameEndMode aEndMode) {
   // Add main eye buffer layer
   XrCompositionLayerProjection projectionLayer{XR_TYPE_COMPOSITION_LAYER_PROJECTION};
   std::vector<XrCompositionLayerProjectionView> projectionLayerViews;
-  projectionLayerViews.resize(targetViews.size());
+  projectionLayerViews.resize(m.views.size());
   projectionLayer.layerFlags = XR_COMPOSITION_LAYER_BLEND_TEXTURE_SOURCE_ALPHA_BIT;
-  for (int i = 0; i < targetViews.size(); ++i) {
+  for (int i = 0; i < m.views.size(); ++i) {
     const OpenXRSwapChainPtr& viewSwapChain =  m.eyeSwapChains[i];
     projectionLayerViews[i] = {XR_TYPE_COMPOSITION_LAYER_PROJECTION_VIEW};
-    projectionLayerViews[i].pose = targetViews[i].pose;
-    projectionLayerViews[i].fov = targetViews[i].fov;
+    projectionLayerViews[i].pose = m.views[i].pose;
+    projectionLayerViews[i].fov = m.views[i].fov;
     projectionLayerViews[i].subImage.swapchain = viewSwapChain->SwapChain();
     projectionLayerViews[i].subImage.imageRect.offset = {0, 0};
     projectionLayerViews[i].subImage.imageRect.extent = {viewSwapChain->Width(), viewSwapChain->Height()};
+    projectionLayer.space = m.viewSpace;
+    projectionLayer.viewCount = (uint32_t)projectionLayerViews.size();
+    projectionLayer.views = projectionLayerViews.data();
   }
-  projectionLayer.space = m.localSpace;
-  projectionLayer.viewCount = (uint32_t)projectionLayerViews.size();
-  projectionLayer.views = projectionLayerViews.data();
   layers.push_back(reinterpret_cast<XrCompositionLayerBaseHeader*>(&projectionLayer));
 
   // Add front UI layers
@@ -908,8 +822,12 @@ DeviceDelegateOpenXR::CreateLayerQuad(int32_t aWidth, int32_t aHeight,
     return nullptr;
   }
 
+  if (aSurfaceType == VRLayerSurface::SurfaceType::AndroidSurface) {
+    return nullptr; // Remove when XR_ERROR_LAYER_INVALID bug is fixed
+  }
+
   VRLayerQuadPtr layer = VRLayerQuad::Create(aWidth, aHeight, aSurfaceType);
-  OpenXRLayerQuadPtr xrLayer = OpenXRLayerQuad::Create(m.javaContext->env, layer);
+  OpenXRLayerQuadPtr xrLayer = OpenXRLayerQuad::Create(m.jniEnv, layer);
   m.AddUILayer(xrLayer, aSurfaceType);
   return layer;
 }
@@ -919,13 +837,16 @@ DeviceDelegateOpenXR::CreateLayerQuad(const VRLayerSurfacePtr& aMoveLayer) {
   if (!m.layersEnabled) {
     return nullptr;
   }
+  if (aMoveLayer->GetSurfaceType() == VRLayerSurface::SurfaceType::AndroidSurface) {
+    return nullptr; // Remove when XR_ERROR_LAYER_INVALID bug is fixed
+  }
 
   VRLayerQuadPtr layer = VRLayerQuad::Create(aMoveLayer->GetWidth(), aMoveLayer->GetHeight(), aMoveLayer->GetSurfaceType());
   OpenXRLayerQuadPtr xrLayer;
 
   for (int i = 0; i < m.uiLayers.size(); ++i) {
     if (m.uiLayers[i]->GetLayer() == aMoveLayer) {
-      xrLayer = OpenXRLayerQuad::Create(m.javaContext->env, layer, m.uiLayers[i]);
+      xrLayer = OpenXRLayerQuad::Create(m.jniEnv, layer, m.uiLayers[i]);
       m.uiLayers.erase(m.uiLayers.begin() + i);
       break;
     }
@@ -942,9 +863,11 @@ DeviceDelegateOpenXR::CreateLayerCylinder(int32_t aWidth, int32_t aHeight,
   if (!m.layersEnabled) {
     return nullptr;
   }
-
+  if (aSurfaceType == VRLayerSurface::SurfaceType::AndroidSurface) {
+    return nullptr; // Remove when XR_ERROR_LAYER_INVALID bug is fixed
+  }
   VRLayerCylinderPtr layer = VRLayerCylinder::Create(aWidth, aHeight, aSurfaceType);
-  OpenXRLayerCylinderPtr xrLayer = OpenXRLayerCylinder::Create(m.javaContext->env, layer);
+  OpenXRLayerCylinderPtr xrLayer = OpenXRLayerCylinder::Create(m.jniEnv, layer);
   m.AddUILayer(xrLayer, aSurfaceType);
   return layer;
 }
@@ -954,13 +877,16 @@ DeviceDelegateOpenXR::CreateLayerCylinder(const VRLayerSurfacePtr& aMoveLayer) {
   if (!m.layersEnabled) {
     return nullptr;
   }
+  if (aMoveLayer->GetSurfaceType() == VRLayerSurface::SurfaceType::AndroidSurface) {
+    return nullptr; // Remove when XR_ERROR_LAYER_INVALID bug is fixed
+  }
 
   VRLayerCylinderPtr layer = VRLayerCylinder::Create(aMoveLayer->GetWidth(), aMoveLayer->GetHeight(), aMoveLayer->GetSurfaceType());
   OpenXRLayerCylinderPtr xrLayer;
 
   for (int i = 0; i < m.uiLayers.size(); ++i) {
     if (m.uiLayers[i]->GetLayer() == aMoveLayer) {
-      xrLayer = OpenXRLayerCylinder::Create(m.javaContext->env, layer, m.uiLayers[i]);
+      xrLayer = OpenXRLayerCylinder::Create(m.jniEnv, layer, m.uiLayers[i]);
       m.uiLayers.erase(m.uiLayers.begin() + i);
       break;
     }
@@ -984,7 +910,7 @@ DeviceDelegateOpenXR::CreateLayerCube(int32_t aWidth, int32_t aHeight, GLint aIn
   m.cubeLayer = OpenXRLayerCube::Create(layer, aInternalFormat);
   if (m.session != XR_NULL_HANDLE) {
     vrb::RenderContextPtr context = m.context.lock();
-    m.cubeLayer->Init(m.javaContext->env, m.session, context);
+    m.cubeLayer->Init(m.jniEnv, m.session, context);
   }
   return layer;
 }
@@ -994,7 +920,9 @@ DeviceDelegateOpenXR::CreateLayerEquirect(const VRLayerPtr &aSource) {
   if (!m.layersEnabled) {
     return nullptr;
   }
-
+  if (true) {
+    return nullptr; // Remove when XR_ERROR_LAYER_INVALID bug is fixed
+  }
   VRLayerEquirectPtr result = VRLayerEquirect::Create();
   OpenXRLayerPtr source;
   for (const OpenXRLayerPtr& layer: m.uiLayers) {
@@ -1009,7 +937,7 @@ DeviceDelegateOpenXR::CreateLayerEquirect(const VRLayerPtr &aSource) {
   m.equirectLayer = OpenXRLayerEquirect::Create(result, source);
   if (m.session != XR_NULL_HANDLE) {
     vrb::RenderContextPtr context = m.context.lock();
-    m.equirectLayer->Init(m.javaContext->env, m.session, context);
+    m.equirectLayer->Init(m.jniEnv, m.session, context);
   }
   return result;
 }
@@ -1039,7 +967,6 @@ void
 DeviceDelegateOpenXR::EnterVR(const crow::BrowserEGLContext& aEGLContext) {
   // Reset reorientation after Enter VR
   m.reorientMatrix = vrb::Matrix::Identity();
-  m.firstPose = std::nullopt;
 
   if (m.session != XR_NULL_HANDLE && m.graphicsBinding.context == aEGLContext.Context()) {
     ProcessEvents();
@@ -1052,7 +979,7 @@ DeviceDelegateOpenXR::EnterVR(const crow::BrowserEGLContext& aEGLContext) {
 
   m.graphicsBinding.context = aEGLContext.Context();
   m.graphicsBinding.display = aEGLContext.Display();
-  m.graphicsBinding.config = aEGLContext.Config();
+  m.graphicsBinding.config = (EGLConfig)0;
 
   XrSessionCreateInfo createInfo{XR_TYPE_SESSION_CREATE_INFO};
   createInfo.next = reinterpret_cast<const XrBaseInStructure*>(&m.graphicsBinding);
@@ -1061,38 +988,29 @@ DeviceDelegateOpenXR::EnterVR(const crow::BrowserEGLContext& aEGLContext) {
   CHECK(m.session != XR_NULL_HANDLE);
   VRB_LOG("OpenXR session created succesfully");
 
+  m.input->Initialize(m.session);
   m.UpdateSpaces();
   m.InitializeViews();
   m.InitializeImmersiveDisplay();
-  m.input = OpenXRInput::Create(m.instance, m.session, m.systemProperties, *m.controller.get());
   ProcessEvents();
-  if (m.controllersReadyCallback && m.input && m.input->AreControllersReady()) {
-    m.controllersReadyCallback();
-    m.controllersReadyCallback = nullptr;
-  }
 
   // Initialize layers if needed
   vrb::RenderContextPtr context = m.context.lock();
   for (OpenXRLayerPtr& layer: m.uiLayers) {
-    layer->Init(m.javaContext->env, m.session, context);
+    layer->Init(m.jniEnv, m.session, context);
   }
   if (m.cubeLayer) {
-    m.cubeLayer->Init(m.javaContext->env, m.session, context);
+    m.cubeLayer->Init(m.jniEnv, m.session, context);
   }
   if (m.equirectLayer) {
-    m.equirectLayer->Init(m.javaContext->env, m.session, context);
+    m.equirectLayer->Init(m.jniEnv, m.session, context);
   }
 }
+
 
 void
 DeviceDelegateOpenXR::LeaveVR() {
   CHECK_MSG(!m.boundSwapChain, "Eye swapChain not released before LeaveVR");
-  if (m.session == XR_NULL_HANDLE) {
-    return;
-  }
-#ifdef HVR
-  xrRequestExitSession(m.session);
-#endif
   ProcessEvents();
 }
 
@@ -1109,12 +1027,6 @@ DeviceDelegateOpenXR::IsInVRMode() const {
 bool
 DeviceDelegateOpenXR::ExitApp() {
   return true;
-}
-
-bool
-DeviceDelegateOpenXR::ShouldExitRenderLoop() const
-{
-  return m.sessionState == XR_SESSION_STATE_EXITING || m.sessionState == XR_SESSION_STATE_LOSS_PENDING;
 }
 
 DeviceDelegateOpenXR::DeviceDelegateOpenXR(State &aState) : m(aState) {}

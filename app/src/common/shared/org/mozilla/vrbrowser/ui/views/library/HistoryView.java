@@ -18,7 +18,6 @@ import androidx.lifecycle.ViewModelProvider;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
-import org.jetbrains.annotations.NotNull;
 import org.mozilla.vrbrowser.R;
 import org.mozilla.vrbrowser.VRBrowserActivity;
 import org.mozilla.vrbrowser.VRBrowserApplication;
@@ -55,7 +54,6 @@ import java.util.stream.Collectors;
 import mozilla.components.concept.storage.VisitInfo;
 import mozilla.components.concept.storage.VisitType;
 import mozilla.components.concept.sync.AccountObserver;
-import mozilla.components.concept.sync.AuthFlowError;
 import mozilla.components.concept.sync.AuthType;
 import mozilla.components.concept.sync.OAuthAccount;
 import mozilla.components.concept.sync.Profile;
@@ -344,11 +342,6 @@ public class HistoryView extends LibraryView implements HistoryStore.HistoryList
 
         @Override
         public void onAuthenticationProblems() {
-            mBinding.setIsSignedIn(false);
-        }
-
-        @Override
-        public void onFlowError(@NotNull AuthFlowError authFlowError) {
             mBinding.setIsSignedIn(false);
         }
     };

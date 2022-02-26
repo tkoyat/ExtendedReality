@@ -9,7 +9,6 @@
 #include "vrb/Forward.h"
 #include "vrb/MacroUtils.h"
 #include "DeviceDelegate.h"
-#include "JNIUtil.h"
 #include <memory>
 
 class android_app;
@@ -22,7 +21,7 @@ typedef std::shared_ptr<DeviceDelegateOpenXR> DeviceDelegateOpenXRPtr;
 
 class DeviceDelegateOpenXR : public DeviceDelegate {
 public:
-  static DeviceDelegateOpenXRPtr Create(vrb::RenderContextPtr& aContext, JavaContext* aJavaContext);
+  static DeviceDelegateOpenXRPtr Create(vrb::RenderContextPtr& aContext, android_app* aApp);
   // DeviceDelegate interface
   device::DeviceType GetDeviceType() override;
   void SetRenderMode(const device::RenderMode aMode) override;
@@ -40,7 +39,6 @@ public:
   void ReleaseControllerDelegate() override;
   int32_t GetControllerModelCount() const override;
   const std::string GetControllerModelName(const int32_t aModelIndex) const override;
-  void OnControllersReady(const std::function<void()>& callback) override;
   void SetCPULevel(const device::CPULevel aLevel) override;
   void ProcessEvents() override;
   bool SupportsFramePrediction(FramePrediction aPrediction) const override;
@@ -62,7 +60,6 @@ public:
   void OnDestroy();
   bool IsInVRMode() const;
   bool ExitApp();
-  bool ShouldExitRenderLoop() const;
 protected:
   struct State;
   DeviceDelegateOpenXR(State& aState);

@@ -7,18 +7,17 @@ apply from: "$project.rootDir/tools/gradle/versionCode.gradle"
 apply plugin: 'kotlin-android'
 apply plugin: 'kotlin-android-extensions'
 apply plugin: "org.mozilla.telemetry.glean-gradle-plugin"
-apply plugin: 'com.huawei.agconnect'
 
 deps.telemetry.glean_unittests = "org.mozilla.telemetry:glean-forUnitTests:$project.ext.glean_version"
 
-//def getGitHash = { ->
-//    def stdout = new ByteArrayOutputStream()
-//    exec {
-//        commandLine 'git', 'rev-parse', '--short', 'HEAD'
-//        standardOutput = stdout
-//    }
-//    return stdout.toString().trim()
-//}
+def getGitHash = { ->
+    def stdout = new ByteArrayOutputStream()
+    exec {
+        commandLine 'git', 'rev-parse', '--short', 'HEAD'
+        standardOutput = stdout
+    }
+    return stdout.toString().trim()
+}
 
 def getTaskclusterBuild = { ->
     if (gradle.hasProperty("userProperties.taskclusterBuild")) {
@@ -62,13 +61,6 @@ def getOpenXRCMakeFlags = { ->
     return ""
 }
 
-def getHVRMLApiKey = { ->
-    if (gradle.hasProperty("userProperties.HVR_ML_API_KEY")) {
-        return gradle."userProperties.HVR_ML_API_KEY"
-    }
-    return ""
-}
-
 // Glean: Generate markdown docs for the collected metrics.
 ext.gleanGenerateMarkdownDocs = true
 ext.gleanDocsDirectory = "$rootDir/docs"
@@ -80,8 +72,8 @@ android {
         minSdkVersion build_versions.min_sdk
         targetSdkVersion build_versions.target_sdk
         versionCode 1
-        versionName "13.0"
-//        buildConfigField "String", "GIT_HASH", "\"${getGitHash()}\""
+        versionName "12.1"
+        buildConfigField "String", "GIT_HASH", "\"${getGitHash()}\""
         buildConfigField "Boolean", "DISABLE_CRASH_RESTART", getCrashRestartDisabled()
         buildConfigField "Boolean", "TASKCLUSTER_BUILD", getTaskclusterBuild()
         buildConfigField "String", "AMO_COLLECTION", "\"fxr\""
@@ -106,10 +98,10 @@ android {
     }
 
     if (gradle.hasProperty('userProperties.taskclusterBuild')) {
-        project.archivesBaseName = "ExtendedReality-$defaultConfig.versionName-$generatedVersionCode"
+        project.archivesBaseName = "ExtendedSoul-$defaultConfig.versionName-$generatedVersionCode"
         defaultConfig.versionCode = generatedVersionCode
     } else {
-        project.archivesBaseName = "ExtendedReality"
+        project.archivesBaseName = "ExtendedSoul"
     }
 
     compileOptions {
@@ -188,13 +180,12 @@ android {
 
         wavevr {
             minSdkVersion build_versions.min_sdk_wave
-            targetSdkVersion build_versions.target_sdk_wave
             dimension "platform"
             externalNativeBuild {
                 cmake {
-                    cppFlags " -I" + file("${project.rootDir}/third_party/wavesdk/build/wvr_client-${versions.wavevr}/include").absolutePath +
+                    cppFlags " -I" + file("${project.rootDir}/third_party/wavesdk/build/wvr_client/include").absolutePath +
                             " -DWAVEVR"
-                    arguments "-DVR_SDK_LIB=wavevr-lib", "-DWAVEVR=ON", "-DWAVE_SDK_VERSION=${versions.wavevr}"
+                    arguments "-DVR_SDK_LIB=wavevr-lib", "-DWAVEVR=ON"
                 }
             }
             applicationIdSuffix ".internal"
@@ -202,13 +193,12 @@ android {
 
         wavevrStore {
             minSdkVersion build_versions.min_sdk_wave
-            targetSdkVersion build_versions.target_sdk_wave
             dimension "platform"
             externalNativeBuild {
                 cmake {
-                    cppFlags " -I" + file("${project.rootDir}/third_party/wavesdk/build/wvr_client-${versions.wavevr}/include").absolutePath +
+                    cppFlags " -I" + file("${project.rootDir}/third_party/wavesdk/build/wvr_client/include").absolutePath +
                             " -DWAVEVR"
-                    arguments "-DVR_SDK_LIB=wavevr-lib", "-DWAVEVR=ON", "-DWAVE_SDK_VERSION=${versions.wavevr}"
+                    arguments "-DVR_SDK_LIB=wavevr-lib", "-DWAVEVR=ON"
                 }
             }
         }
@@ -232,17 +222,6 @@ android {
                     arguments "-DPICOVR=ON"
                 }
             }
-        }
-
-        hvr {
-            dimension "platform"
-            externalNativeBuild {
-                cmake {
-                    cppFlags " -DHVR -DHVR_6DOF -DOPENXR -I" + file("src/openxr/cpp").absolutePath
-                    arguments "-DVR_SDK_LIB=hvr-lib", "-DHVR=ON", "-DOPENXR=ON"
-                }
-            }
-            buildConfigField "String", "HVR_ML_API_KEY", "\"${getHVRMLApiKey()}\""
         }
 
         noapi {
@@ -290,9 +269,7 @@ android {
                 'noapiArm64Debug',
                 'noapiArm64Release',
                 'noapiX86_64Debug',
-                'noapiX86_64Release',
-                'hvrArm64Debug',
-                'hvrArm64Release'
+                'noapiX86_64Release'
         ]
         variant.setIgnore(!needed)
     }
@@ -377,7 +354,7 @@ android {
             res.srcDirs = [
                     'src/wavevr/res'
             ]
-            jniLibs.srcDirs = ["${project.rootDir}/third_party/wavesdk/build/wvr_client-${versions.wavevr}/jni"]
+            jniLibs.srcDirs = ["${project.rootDir}/third_party/wavesdk/build/wvr_client/jni"]
         }
 
         wavevrStore {
@@ -390,7 +367,7 @@ android {
             assets.srcDirs = [
                     'src/wavevr/assets'
             ]
-            jniLibs.srcDirs = ["${project.rootDir}/third_party/wavesdk/build/wvr_client-${versions.wavevr}/jni"]
+            jniLibs.srcDirs = ["${project.rootDir}/third_party/wavesdk/build/wvr_client/jni"]
             manifest.srcFile "src/wavevr/AndroidManifest.xml"
         }
 
@@ -415,18 +392,6 @@ android {
             manifest.srcFile "src/picovr/AndroidManifest.xml"
         }
 
-        hvr {
-            java.srcDirs = [
-                    'src/hvr/java'
-            ]
-            assets.srcDirs = [
-                    'src/hvr/assets'
-            ]
-            res.srcDirs = [
-                    'src/hvr/res'
-            ]
-        }
-
         noapi {
             java.srcDirs = [
                     'src/noapi/java'
@@ -444,7 +409,6 @@ android {
 }
 
 configurations {
-    jnaForTest
     armImplementation
     x86Implementation
 }
@@ -462,8 +426,6 @@ dependencies {
     // Common
     implementation deps.lifecycle.runtime
     implementation deps.lifecycle.viewmodel
-    implementation deps.lifecycle.java8
-    implementation deps.lifecycle.process
     implementation deps.support.cardview
     implementation deps.support.app_compat
     implementation deps.support.vector_drawable
@@ -520,20 +482,12 @@ dependencies {
     testImplementation deps.app_services.rustlog
     testImplementation deps.android_components.support_test
     testImplementation deps.android_components.support_test_appservices
-    jnaForTest deps.jna
-    testImplementation files(configurations.jnaForTest.copyRecursive().files)
     testImplementation deps.telemetry.glean_unittests
     testImplementation deps.work.testing
 
     // Pico
     picovrImplementation fileTree(dir: "${project.rootDir}/third_party/picovr/", include: ['*.aar'])
     picovrStoreImplementation fileTree(dir: "${project.rootDir}/third_party/picovr/", include: ['*.aar'])
-
-    // HVR
-    hvrImplementation fileTree(dir: "${project.rootDir}/third_party/hvr", include: ['*.jar'])
-    hvrImplementation 'com.huawei.agconnect:agconnect-core-harmony:1.0.0.300'
-    hvrImplementation 'com.huawei.agconnect:agconnect-core:1.6.0.300'
-    hvrImplementation 'com.huawei.hms:ml-computer-voice-asr:3.1.0.300'
 }
 
 if (findProject(':servo')) {
@@ -544,12 +498,13 @@ if (findProject(':servo')) {
 
 if (findProject(':wavesdk')) {
     dependencies {
-        wavevrImplementation fileTree(dir: "${project.rootDir}/third_party/wavesdk/", include: ['*.aar'])
-        wavevrStoreImplementation fileTree(dir: "${project.rootDir}/third_party/wavesdk/", include: ['*.aar'])
+        wavevrImplementation project(':wavesdk')
+        wavevrStoreImplementation project(':wavesdk')
     }
 }
 
 dependencies {
+
     implementation project(path: ':uvccamerasdk')
     implementation 'com.google.android.material:material:1.0.0'
     implementation 'androidx.viewpager2:viewpager2:1.0.0'

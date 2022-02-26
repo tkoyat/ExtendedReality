@@ -76,8 +76,5 @@ tools/webgfx-tests-fxr/
 # Room schemas
 app/schemas/
 
-# HVR app connect
-app/agconnect-services.json
-
 # Token files
 .mls_token

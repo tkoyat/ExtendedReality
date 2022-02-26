@@ -793,7 +793,7 @@ public class NavigationBarWidget extends UIWidget implements GeckoSession.Naviga
         if (mFullScreenMedia != null && mFullScreenMedia.getWidth() > 0 && mFullScreenMedia.getHeight() > 0) {
             final boolean resetBorder = aProjection == VideoProjectionMenuWidget.VIDEO_PROJECTION_360 ||
                     aProjection == VideoProjectionMenuWidget.VIDEO_PROJECTION_360_STEREO;
-            mAttachedWindow.enableVRVideoMode((int)mFullScreenMedia.getWidth(), (int)mFullScreenMedia.getHeight(), resetBorder);
+            mAttachedWindow.enableVRVideoMode(mFullScreenMedia.getWidth(), mFullScreenMedia.getHeight(), resetBorder);
             // Handle video resize while in VR video playback
             mFullScreenMedia.setResizeDelegate((width, height) -> {
                 mAttachedWindow.enableVRVideoMode(width, height, resetBorder);
@@ -1049,11 +1049,6 @@ public class NavigationBarWidget extends UIWidget implements GeckoSession.Naviga
                 !SettingsStore.getInstance(getContext()).isDrmContentPlaybackEnabled());
     }
 
-    @Override
-    public boolean onHandleExternalRequest(@NonNull String uri) {
-        return mWidgetManager.getFocusedWindow().onHandleExternalRequest(uri);
-    }
-
     // VoiceSearch Delegate
 
     @Override
@@ -1115,6 +1110,19 @@ public class NavigationBarWidget extends UIWidget implements GeckoSession.Naviga
     public void onPrivateBrowsingClicked() {
 
     }
+
+//    @Override
+//    public void onLibraryClicked() {
+//        if (mAttachedWindow.isResizing()) {
+//            exitResizeMode(ResizeAction.RESTORE_SIZE);
+//
+//        } else if (mAttachedWindow.isFullScreen()) {
+//            exitFullScreenMode();
+//
+//        } else if (mViewModel.getIsInVRVideo().getValue().get()) {
+//            exitVRVideo();
+//        }
+//    }
 
     private void finishWidgetResize() {
         mWidgetManager.finishWidgetResize(mAttachedWindow);

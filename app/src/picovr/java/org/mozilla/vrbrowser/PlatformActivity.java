@@ -10,7 +10,6 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
-import android.os.Build;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.KeyEvent;
@@ -18,12 +17,12 @@ import android.view.KeyEvent;
 import androidx.annotation.Keep;
 import androidx.annotation.NonNull;
 
-import com.picovr.client.HbController;
 import com.picovr.client.HbListener;
+import com.picovr.cvclient.ButtonNum;
+import com.picovr.client.HbController;
 import com.picovr.client.HbManager;
 import com.picovr.client.HbTool;
 import com.picovr.client.Orientation;
-import com.picovr.cvclient.ButtonNum;
 import com.picovr.cvclient.CVController;
 import com.picovr.cvclient.CVControllerListener;
 import com.picovr.cvclient.CVControllerManager;
@@ -32,8 +31,8 @@ import com.picovr.vractivity.Eye;
 import com.picovr.vractivity.HmdState;
 import com.picovr.vractivity.RenderInterface;
 import com.picovr.vractivity.VRActivity;
-import com.psmart.vrlib.PicovrSDK;
 import com.psmart.vrlib.VrActivity;
+import com.psmart.vrlib.PicovrSDK;
 
 import org.mozilla.vrbrowser.utils.DeviceType;
 import org.mozilla.vrbrowser.utils.SystemUtils;
@@ -42,21 +41,6 @@ import org.mozilla.vrbrowser.utils.SystemUtils;
 public class PlatformActivity extends VRActivity implements RenderInterface, CVControllerListener {
     static String LOGTAG = SystemUtils.createLogtag(PlatformActivity.class);
     private static final int CONFIRM_BUTTON = 1001;
-
-    private static @DeviceType.Type
-    int deviceType() {
-        if (Build.MODEL.toLowerCase().contains("g2")) {
-            return DeviceType.PicoG2;
-
-        } else if (Build.MODEL.toLowerCase().contains("neo 2")) {
-            return DeviceType.PicoNeo2;
-
-        } else if (Build.MODEL.toLowerCase().contains("neo 3")) {
-            return DeviceType.PicoNeo3;
-        }
-
-        return DeviceType.Unknown;
-    }
 
     public static boolean filterPermission(final String aPermission) {
         return aPermission.equals(Manifest.permission.CAMERA);
@@ -82,7 +66,7 @@ public class PlatformActivity extends VRActivity implements RenderInterface, CVC
     CVControllerManager mControllerManager;
     HbManager mHbManager;
     private boolean mControllersReady;
-    private @DeviceType.Type int mType = deviceType();
+    private int mType = 0;
     private int mHand = 0;
     // These need to match DeviceDelegatePicoVR.cpp
     private final int BUTTON_APP       = 1;
@@ -100,8 +84,6 @@ public class PlatformActivity extends VRActivity implements RenderInterface, CVC
         nativeOnCreate();
         super.onCreate(bundle);
 
-        Log.i(LOGTAG, "PicoVrSDK version: " + PicovrSDK.getSDKVersion());
-
         IntentFilter filter = new IntentFilter();
         filter.addAction(Intent.ACTION_CLOSE_SYSTEM_DIALOGS);
         registerReceiver(mKeysReceiver, filter);
@@ -109,9 +91,12 @@ public class PlatformActivity extends VRActivity implements RenderInterface, CVC
         if (ControllerClient.isControllerServiceExisted(this)) {
             mControllerManager = new CVControllerManager(this);
             mControllerManager.setListener(this);
+            mType = 1; // 6Dof Headset
             // Enable high res
             PicovrSDK.SetEyeBufferSize(1920, 1920);
+            DeviceType.setType(DeviceType.PicoNeo2);
         } else {
+            DeviceType.setType(DeviceType.PicoG2);
             mHbManager = new HbManager(this);
             mHbManager.InitServices();
             mHbManager.setHbListener(new HbListener() {
@@ -194,11 +179,6 @@ public class PlatformActivity extends VRActivity implements RenderInterface, CVC
         float ipd = hmdState.getIpd();
         float fov = hmdState.getFov();
         nativeStartFrame(ipd, fov, p[0], p[1], p[2], q[0], q[1], q[2], q[3]);
-        if (mControllerManager != null) {
-            mControllerManager.updateControllerData(new float[] {
-                q[0],q[1],q[2],q[3],p[0],p[1],p[2]
-            });
-        }
     }
 
     private void updateControllers() {
@@ -334,11 +314,8 @@ public class PlatformActivity extends VRActivity implements RenderInterface, CVC
 
     @Override
     public void onRendererShutdown() {
-        nativeDestroy();
-    }
-
-    public void deInitGL(){
         nativeShutdown();
+        nativeDestroy();
     }
 
     @Override

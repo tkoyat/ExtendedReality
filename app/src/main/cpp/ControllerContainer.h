@@ -12,7 +12,6 @@
 #include "vrb/Forward.h"
 #include "vrb/MacroUtils.h"
 #include "vrb/Matrix.h"
-#include "vrb/LoaderThread.h"
 #include <memory>
 #include <string>
 #include <vector>
@@ -25,11 +24,9 @@ typedef std::shared_ptr<ControllerContainer> ControllerContainerPtr;
 class ControllerContainer : public crow::ControllerDelegate  {
 public:
   enum class HandEnum { Left, Right };
-  static ControllerContainerPtr Create(vrb::CreationContextPtr& aContext, const vrb::GroupPtr& aPointerContainer, const vrb::ModelLoaderAndroidPtr& aLoader);
+  static ControllerContainerPtr Create(vrb::CreationContextPtr& aContext, const vrb::GroupPtr& aPointerContainer);
   vrb::TogglePtr GetRoot() const;
   void LoadControllerModel(const int32_t aModelIndex, const vrb::ModelLoaderAndroidPtr& aLoader, const std::string& aFileName);
-  void LoadControllerModel(const int32_t aModelIndex);
-  void SetControllerModelTask(const int32_t aModelIndex, const vrb::LoadTask& aTask);
   void InitializeBeam();
   void Reset();
   std::vector<Controller>& GetControllers();
@@ -39,7 +36,6 @@ public:
   void CreateController(const int32_t aControllerIndex, const int32_t aModelIndex, const std::string& aImmersiveName) override;
   void CreateController(const int32_t aControllerIndex, const int32_t aModelIndex, const std::string& aImmersiveName, const vrb::Matrix& aBeamTransform) override;
   void SetImmersiveBeamTransform(const int32_t aControllerIndex, const vrb::Matrix& aImmersiveBeamTransform) override;
-  void SetBeamTransform(const int32_t aControllerIndex, const vrb::Matrix& aBeamTransform) override;
   void SetFocused(const int32_t aControllerIndex) override;
   void DestroyController(const int32_t aControllerIndex) override;
   void SetCapabilityFlags(const int32_t aControllerIndex, const device::CapabilityFlags aFlags) override;

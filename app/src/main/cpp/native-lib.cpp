@@ -56,7 +56,6 @@ struct AppContext {
   vrb::RunnableQueuePtr mQueue;
   BrowserEGLContextPtr mEgl;
   PlatformDeviceDelegatePtr mDevice;
-  JavaContext mJavaContext;
 };
 typedef std::shared_ptr<AppContext> AppContextPtr;
 
@@ -95,6 +94,9 @@ CommandCallback(android_app *aApp, int32_t aCmd) {
     // after calling android_app_exec_cmd it will be set to NULL.
     case APP_CMD_TERM_WINDOW:
       VRB_LOG("APP_CMD_TERM_WINDOW");
+      if (ctx->mDevice->IsInVRMode()) {
+         ctx->mDevice->LeaveVR();
+      }
       if (ctx->mEgl) {
         ctx->mEgl->UpdateNativeWindow(nullptr);
       }
@@ -132,6 +134,7 @@ extern "C" {
 
 void
 android_main(android_app *aAppState) {
+
   if (!ALooper_forThread()) {
     ALooper_prepare(0);
   }
@@ -139,23 +142,14 @@ android_main(android_app *aAppState) {
   // Attach JNI thread
   JNIEnv *jniEnv;
   (*aAppState->activity->vm).AttachCurrentThread(&jniEnv, nullptr);
-
-  if (!sAppContext) {
-    sAppContext = std::make_shared<AppContext>();
-    sAppContext->mQueue = vrb::RunnableQueue::Create(aAppState->activity->vm);
-  }
-
   sAppContext->mQueue->AttachToThread();
 
   // Create Browser context
   crow::VRBrowser::InitializeJava(jniEnv, aAppState->activity->clazz);
 
   // Create device delegate
-  sAppContext->mJavaContext.env = jniEnv;
-  sAppContext->mJavaContext.vm = aAppState->activity->vm;
-  sAppContext->mJavaContext.activity = aAppState->activity->clazz;
-
-  sAppContext->mDevice = PlatformDeviceDelegate::Create(BrowserWorld::Instance().GetRenderContext(), &sAppContext->mJavaContext);
+  sAppContext->mDevice = PlatformDeviceDelegate::Create(BrowserWorld::Instance().GetRenderContext(),
+                                                        aAppState);
   BrowserWorld::Instance().RegisterDeviceDelegate(sAppContext->mDevice);
 
   // Initialize java
@@ -211,9 +205,6 @@ android_main(android_app *aAppState) {
       // OpenXR requires to wait for the XR_SESSION_STATE_READY to start presenting
       // We need to call ProcessEvents to make sure we receive the event.
       sAppContext->mDevice->ProcessEvents();
-      if (sAppContext->mDevice->ShouldExitRenderLoop()) {
-        return;
-      }
     }
 #endif
   }
@@ -237,9 +228,6 @@ JNI_METHOD(jboolean, platformExit)
 }
 
 jint JNI_OnLoad(JavaVM* aVm, void*) {
-  if (sAppContext) {
-    return JNI_VERSION_1_6;
-  }
   sAppContext = std::make_shared<AppContext>();
   sAppContext->mQueue = vrb::RunnableQueue::Create(aVm);
   return JNI_VERSION_1_6;

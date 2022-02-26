@@ -75,7 +75,11 @@ public class AddonOptionsPermissionsView extends RecyclerView.ViewHolder impleme
 
         // Update permissions list
         if (addon != null) {
-            mAdapter.setPermissionsList(addon.translatePermissions(mContext).stream()
+            mAdapter.setPermissionsList(addon.translatePermissions().stream()
+                    .map(integer -> {
+                        @StringRes int stringId = integer;
+                        return mContext.getString(stringId);
+                    })
                     .sorted()
                     .collect(Collectors.toList()));
         }

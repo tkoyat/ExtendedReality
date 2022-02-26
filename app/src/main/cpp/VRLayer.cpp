@@ -7,7 +7,6 @@
 #include "vrb/ConcreteClass.h"
 #include "vrb/Color.h"
 #include "vrb/Matrix.h"
-#include "VRBrowser.h"
 
 namespace crow {
 
@@ -324,21 +323,13 @@ VRLayerSurface::SetBindDelegate(const BindDelegate& aDelegate) {
 
 void
 VRLayerSurface::SetSurface(jobject aSurface) {
-  auto oldSurface = m.surface;
-  m.surface =  aSurface ? VRBrowser::Env()->NewGlobalRef(aSurface) : nullptr;
-  if (oldSurface) {
-    VRBrowser::Env()->DeleteGlobalRef(oldSurface);
-  }
+  m.surface = aSurface;
 }
 
 VRLayerSurface::VRLayerSurface(State& aState, LayerType aLayerType): VRLayer(aState, aLayerType), m(aState) {
 }
 
-VRLayerSurface::~VRLayerSurface() {
-  if (m.surface) {
-    VRBrowser::Env()->DeleteGlobalRef(m.surface);
-  }
-}
+VRLayerSurface::~VRLayerSurface() {}
 
 // Layer Quad
 

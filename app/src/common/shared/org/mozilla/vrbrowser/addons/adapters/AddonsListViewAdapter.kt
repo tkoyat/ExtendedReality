@@ -98,6 +98,7 @@ class AddonsManagerAdapter(
         val context = parent.context
         val inflater = LayoutInflater.from(context)
         val view = inflater.inflate(R.layout.addons_item, parent, false)
+        val iconContainer = view.findViewById<CardView>(R.id.icon_container)
         val iconView = view.findViewById<ImageView>(R.id.add_on_icon)
         val titleView = view.findViewById<TextView>(R.id.add_on_name)
         val summaryView = view.findViewById<TextView>(R.id.add_on_description)
@@ -108,6 +109,7 @@ class AddonsManagerAdapter(
         val allowedInPrivateBrowsingLabel = view.findViewById<ImageView>(R.id.allowed_in_private_browsing_label)
         return AddonViewHolder(
             view,
+            iconContainer,
             iconView,
             titleView,
             summaryView,
@@ -147,7 +149,7 @@ class AddonsManagerAdapter(
     internal fun bindAddon(holder: AddonViewHolder, addon: Addon) {
         val context = holder.itemView.context
         addon.rating?.let {
-            val userCount = context.getString(R.string.mozac_feature_addons_user_rating_count_2)
+            val userCount = context.getString(R.string.mozac_feature_addons_user_rating_count)
             val ratingContentDescription =
                 String.format(
                     context.getString(R.string.mozac_feature_addons_rating_content_description),
@@ -190,8 +192,8 @@ class AddonsManagerAdapter(
         style?.maybeSetPrivateBrowsingLabelDrawale(holder.allowedInPrivateBrowsingLabel)
 
         style?.addonBackgroundIconColor?.let {
-            val backgroundColor = ContextCompat.getColor(holder.iconView.context, it)
-            holder.iconView.setBackgroundColor(backgroundColor)
+            val backgroundColor = ContextCompat.getColor(holder.iconContainer.context, it)
+            holder.iconContainer.setCardBackgroundColor(backgroundColor)
         }
         fetchIcon(addon, holder.iconView)
         style?.maybeSetAddonNameTextColor(holder.titleView)

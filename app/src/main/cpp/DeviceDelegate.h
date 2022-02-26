@@ -12,7 +12,6 @@
 #include "ControllerDelegate.h"
 #include "GestureDelegate.h"
 #include "VRLayer.h"
-#include "vrb/LoaderThread.h"
 
 #include <memory>
 
@@ -71,7 +70,7 @@ public:
   virtual void SetControllerDelegate(ControllerDelegatePtr& aController) = 0;
   virtual void ReleaseControllerDelegate() = 0;
   virtual int32_t GetControllerModelCount() const = 0;
-  virtual const std::string GetControllerModelName(const int32_t aModelIndex) const { return nullptr; };
+  virtual const std::string GetControllerModelName(const int32_t aModelIndex) const = 0;
   virtual void SetCPULevel(const device::CPULevel aLevel) {};
   virtual void ProcessEvents() = 0;
   virtual bool SupportsFramePrediction(FramePrediction aPrediction) const {
@@ -93,10 +92,6 @@ public:
   virtual VRLayerEquirectPtr CreateLayerEquirect(const VRLayerPtr &aSource) { return nullptr; }
   virtual void DeleteLayer(const VRLayerPtr& aLayer) {};
   virtual bool IsControllerLightEnabled() const { return true; }
-  virtual vrb::LoadTask GetControllerModelTask(int32_t index) { return nullptr; } ;
-  virtual void OnControllersReady(const std::function<void()>& callback) {
-    callback();
-  }
 protected:
   DeviceDelegate() {}
 

@@ -5,7 +5,6 @@
 
 package org.mozilla.vrbrowser.ui.widgets;
 
-import android.content.ActivityNotFoundException;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -37,12 +36,11 @@ import androidx.annotation.UiThread;
 import androidx.core.content.FileProvider;
 import androidx.lifecycle.ViewModelProvider;
 
-import org.jetbrains.annotations.NotNull;
 import org.mozilla.geckoview.AllowOrDeny;
 import org.mozilla.geckoview.GeckoResult;
 import org.mozilla.geckoview.GeckoSession;
-import org.mozilla.geckoview.MediaSession;
-import org.mozilla.geckoview.WebResponse;
+import org.mozilla.geckoview.MediaElement;
+import org.mozilla.geckoview.PanZoomController;
 import org.mozilla.vrbrowser.R;
 import org.mozilla.vrbrowser.VRBrowserActivity;
 import org.mozilla.vrbrowser.VRBrowserApplication;
@@ -88,7 +86,7 @@ public class WindowWidget extends UIWidget implements SessionChangeListener,
         GeckoSession.ContentDelegate, GeckoSession.NavigationDelegate, VideoAvailabilityListener,
         GeckoSession.HistoryDelegate, GeckoSession.ProgressDelegate, GeckoSession.SelectionActionDelegate,
         Session.WebXRStateChangedListener, Session.PopUpStateChangedListener,
-        Session.DrmStateChangedListener, Session.ExternalRequestDelegate, SharedPreferences.OnSharedPreferenceChangeListener {
+        Session.DrmStateChangedListener, SharedPreferences.OnSharedPreferenceChangeListener {
 
     @IntDef(value = { SESSION_RELEASE_DISPLAY, SESSION_DO_NOT_RELEASE_DISPLAY})
     public @interface OldSessionDisplayAction {}
@@ -178,8 +176,7 @@ public class WindowWidget extends UIWidget implements SessionChangeListener,
         mPrefs.registerOnSharedPreferenceChangeListener(this);
 
         mWidgetManager = (WidgetManagerDelegate) aContext;
-        // TODO: Fix the compositor in Gecko to support correct border offset
-        mBorderWidth = 0; //SettingsStore.getInstance(aContext).getTransparentBorderWidth();
+        mBorderWidth = SettingsStore.getInstance(aContext).getTransparentBorderWidth();
 
         mDownloadsManager = mWidgetManager.getServicesProvider().getDownloadsManager();
 
@@ -238,7 +235,7 @@ public class WindowWidget extends UIWidget implements SessionChangeListener,
         aPlacement.width = windowWidth + mBorderWidth * 2;
         aPlacement.height = SettingsStore.getInstance(getContext()).getWindowHeight() + mBorderWidth * 2;
         aPlacement.worldWidth = WidgetPlacement.floatDimension(getContext(), R.dimen.window_world_width) *
-                (float)windowWidth / (float)SettingsStore.WINDOW_WIDTH_DEFAULT;
+                                (float)windowWidth / (float)SettingsStore.WINDOW_WIDTH_DEFAULT;
         aPlacement.density = 1.0f;
         aPlacement.visible = true;
         aPlacement.cylinder = true;
@@ -258,8 +255,6 @@ public class WindowWidget extends UIWidget implements SessionChangeListener,
         aSession.addWebXRStateChangedListener(this);
         aSession.addPopUpStateChangedListener(this);
         aSession.addDrmStateChangedListener(this);
-        aSession.setExternalRequestDelegate(this);
-        aSession.setVideoAvailabilityDelegate(this);
     }
 
     void cleanListeners(Session aSession) {
@@ -273,8 +268,6 @@ public class WindowWidget extends UIWidget implements SessionChangeListener,
         aSession.removeWebXRStateChangedListener(this);
         aSession.removePopUpStateChangedListener(this);
         aSession.removeDrmStateChangedListener(this);
-        aSession.setExternalRequestDelegate(null);
-        aSession.setVideoAvailabilityDelegate(null);
     }
 
     @Override
@@ -447,9 +440,6 @@ public class WindowWidget extends UIWidget implements SessionChangeListener,
                 mWidgetManager.updateWidget(WindowWidget.this);
                 mWidgetManager.popWorldBrightness(WindowWidget.this);
                 mWidgetManager.popBackHandler(mBackHandler);
-                if (mTexture != null) {
-                    resumeCompositor();
-                }
             }
         }
     }
@@ -578,9 +568,7 @@ public class WindowWidget extends UIWidget implements SessionChangeListener,
             return;
         }
         mIsInVRVideoMode = false;
-
-        // TODO: Fix the compositor in Gecko to support correct border offset
-        int border = 0; // SettingsStore.getInstance(getContext()).getTransparentBorderWidth();
+        int border = SettingsStore.getInstance(getContext()).getTransparentBorderWidth();
         if (mWidthBackup == mWidth && mHeightBackup == mHeight && border == mBorderWidth) {
             return;
         }
@@ -762,7 +750,7 @@ public class WindowWidget extends UIWidget implements SessionChangeListener,
             mTexture.setDefaultBufferSize(aWidth, aHeight);
         }
 
-        if (mTexture != null && mSurface != null && mView == null) {
+        if (mSurface != null && mView == null) {
             callSurfaceChanged();
         }
     }
@@ -917,9 +905,9 @@ public class WindowWidget extends UIWidget implements SessionChangeListener,
     }
 
     public void addWindowListener(WindowListener aListener) {
-        if (!mListeners.contains(aListener)) {
-            mListeners.add(aListener);
-        }
+       if (!mListeners.contains(aListener)) {
+           mListeners.add(aListener);
+       }
     }
 
     public void removeWindowListener(WindowListener aListener) {
@@ -1118,7 +1106,7 @@ public class WindowWidget extends UIWidget implements SessionChangeListener,
         // Update the title bar media controls state
         boolean mediaAvailable = mSession.getActiveVideo() != null;
         if (mediaAvailable) {
-            if (mSession.getActiveVideo().isPlaying()) {
+            if (mSession.getActiveVideo().isPlayed()) {
                 mViewModel.setIsMediaPlaying(true);
             }
             mViewModel.setIsMediaAvailable(true);
@@ -1219,7 +1207,7 @@ public class WindowWidget extends UIWidget implements SessionChangeListener,
         GeckoSession session = mSession.getGeckoSession();
         return (session != null) && session.getTextInput().onKeyMultiple(aKeyCode, repeatCount, aEvent);
     }
-
+    
     @Override
     protected void onFocusChanged(boolean aGainFocus, int aDirection, Rect aPreviouslyFocusedRect) {
         super.onFocusChanged(aGainFocus, aDirection, aPreviouslyFocusedRect);
@@ -1229,11 +1217,7 @@ public class WindowWidget extends UIWidget implements SessionChangeListener,
     @Override
     public boolean onTouchEvent(MotionEvent aEvent) {
         GeckoSession session = mSession.getGeckoSession();
-        if (session == null) {
-            return false;
-        }
-        session.getPanZoomController().onTouchEvent(aEvent);
-        return true;
+        return (session != null) && session.getPanZoomController().onTouchEvent(aEvent) == PanZoomController.INPUT_RESULT_HANDLED;
     }
 
     @Override
@@ -1242,11 +1226,7 @@ public class WindowWidget extends UIWidget implements SessionChangeListener,
             return super.onGenericMotionEvent(aEvent);
         } else {
             GeckoSession session = mSession.getGeckoSession();
-            if (session == null) {
-                return false;
-            }
-            session.getPanZoomController().onMotionEvent(aEvent);
-            return true;
+            return (session != null) && session.getPanZoomController().onMotionEvent(aEvent) == PanZoomController.INPUT_RESULT_HANDLED;
         }
     }
 
@@ -1458,7 +1438,7 @@ public class WindowWidget extends UIWidget implements SessionChangeListener,
 
     public @NonNull Pair<Float, Float> getSizeForScale(float aScale, float aAspect) {
         float worldWidth = WidgetPlacement.floatDimension(getContext(), R.dimen.window_world_width) *
-                (float)SettingsStore.getInstance(getContext()).getWindowWidth() / (float)SettingsStore.WINDOW_WIDTH_DEFAULT;
+                    (float)SettingsStore.getInstance(getContext()).getWindowWidth() / (float)SettingsStore.WINDOW_WIDTH_DEFAULT;
         float worldHeight = worldWidth / aAspect;
         float area = worldWidth * worldHeight * aScale;
         float targetWidth = (float) Math.sqrt(area * aAspect);
@@ -1600,7 +1580,7 @@ public class WindowWidget extends UIWidget implements SessionChangeListener,
 
     private boolean isContextMenuVisible() {
         return (mContextMenu != null && mContextMenu.isVisible() ||
-                mSelectionMenu != null && mSelectionMenu.isVisible());
+            mSelectionMenu != null && mSelectionMenu.isVisible());
     }
 
     // GeckoSession.ContentDelegate
@@ -1671,11 +1651,11 @@ public class WindowWidget extends UIWidget implements SessionChangeListener,
     }
 
     @Override
-    public void onExternalResponse(@NonNull GeckoSession geckoSession, @NonNull WebResponse webResponseInfo) {
+    public void onExternalResponse(@NonNull GeckoSession geckoSession, @NonNull GeckoSession.WebResponseInfo webResponseInfo) {
         // We don't want to trigger downloads of already downloaded files that we can't open
         // so we let the system handle it.
-       /* if (!UrlUtils.isFileUri(webResponseInfo.uri)) {
-            DownloadJob job = DownloadJob.from(webResponseInfo.uri);
+        if (!UrlUtils.isFileUri(webResponseInfo.uri)) {
+            DownloadJob job = DownloadJob.from(webResponseInfo);
             startDownload(job, true);
 
         } else {
@@ -1712,23 +1692,29 @@ public class WindowWidget extends UIWidget implements SessionChangeListener,
                         getResources().getString(R.string.download_open_file_open_unsupported_body),
                         null);
             }
-        }*/
+        }
     }
 
     // VideoAvailabilityListener
 
     @Override
     public void onVideoAvailabilityChanged(@NonNull Media aMedia, boolean aVideoAvailable) {
+        boolean mediaAvailable;
         if (mSession != null) {
             if (aVideoAvailable) {
                 aMedia.addMediaListener(mMediaDelegate);
+
             } else {
                 aMedia.removeMediaListener(mMediaDelegate);
             }
+            mediaAvailable = mSession.getActiveVideo() != null;
+
+        } else {
+            mediaAvailable = false;
         }
 
-        if (aVideoAvailable) {
-            if (aMedia.isPlaying()) {
+        if (mediaAvailable) {
+            if (mSession.getActiveVideo().isPlayed()) {
                 mViewModel.setIsMediaPlaying(true);
             }
             mViewModel.setIsMediaAvailable(true);
@@ -1739,28 +1725,29 @@ public class WindowWidget extends UIWidget implements SessionChangeListener,
         }
     }
 
-   MediaSession.Delegate mMediaDelegate = new MediaSession.Delegate() {
-
-       @Override
-       public void onPlay(@NonNull @NotNull GeckoSession session, @NonNull @NotNull MediaSession mediaSession) {
-           mViewModel.setIsMediaAvailable(true);
-           mViewModel.setIsMediaPlaying(true);
-       }
-
-       @Override
-       public void onPause(@NonNull @NotNull GeckoSession session, @NonNull @NotNull MediaSession mediaSession) {
-           mViewModel.setIsMediaAvailable(true);
-           mViewModel.setIsMediaPlaying(false);
-       }
-
-       @Override
-       public void onStop(@NonNull @NotNull GeckoSession session, @NonNull @NotNull MediaSession mediaSession) {
-           mViewModel.setIsMediaAvailable(true);
-           mViewModel.setIsMediaPlaying(false);
-       }
+    MediaElement.Delegate mMediaDelegate = new MediaElement.Delegate() {
+        @Override
+        public void onPlaybackStateChange(@NonNull MediaElement mediaElement, int state) {
+            switch(state) {
+                case MediaElement.MEDIA_STATE_PLAY:
+                case MediaElement.MEDIA_STATE_PLAYING:
+                    mViewModel.setIsMediaAvailable(true);
+                    mViewModel.setIsMediaPlaying(true);
+                    break;
+                case MediaElement.MEDIA_STATE_PAUSE:
+                    mViewModel.setIsMediaAvailable(true);
+                    mViewModel.setIsMediaPlaying(false);
+                    break;
+                case MediaElement.MEDIA_STATE_ABORT:
+                case MediaElement.MEDIA_STATE_EMPTIED:
+                    mViewModel.setIsMediaAvailable(false);
+                    mViewModel.setIsMediaPlaying(false);
+            }
+        }
     };
 
     // GeckoSession.NavigationDelegate
+
 
     @Override
     public void onPageStart(@NonNull GeckoSession geckoSession, @NonNull String aUri) {
@@ -1838,7 +1825,7 @@ public class WindowWidget extends UIWidget implements SessionChangeListener,
             } else {
                 hideLibraryPanel();
             }
-
+            
         } else {
             hideLibraryPanel();
         }
@@ -2087,53 +2074,5 @@ public class WindowWidget extends UIWidget implements SessionChangeListener,
     public void onDrmStateChanged(Session aSession, @SessionState.DrmState int aDrmState) {
         mViewModel.setIsDrmUsed(aDrmState == SessionState.DRM_BLOCKED ||
                 aDrmState == SessionState.DRM_ALLOWED);
-    }
-
-
-    // ExternalRequestDelegate
-
-    @Override
-    public boolean onHandleExternalRequest(@NonNull String url) {
-        if (UrlUtils.isEngineSupportedScheme(url)) {
-            return false;
-
-        } else {
-            Intent intent;
-            try {
-                intent = Intent.parseUri(url, Intent.URI_INTENT_SCHEME);
-            } catch (Exception ex) {
-                mWidgetManager.getFocusedWindow().showAlert(
-                        getResources().getString(R.string.external_open_uri_error_title),
-                        getResources().getString(R.string.external_open_uri_error_bad_uri_body, url),
-                        null);
-                return false;
-            }
-
-            intent.addCategory(Intent.CATEGORY_BROWSABLE);
-            intent.setComponent(null);
-            Intent selector = intent.getSelector();
-            if (selector != null) {
-                selector.addCategory(Intent.CATEGORY_BROWSABLE);
-                selector.setComponent(null);
-            }
-
-            try {
-                getContext().startActivity(intent);
-            } catch (ActivityNotFoundException ex) {
-                mWidgetManager.getFocusedWindow().showAlert(
-                        getResources().getString(R.string.external_open_uri_error_title),
-                        getResources().getString(R.string.external_open_uri_error_no_activity_body, url),
-                        null);
-                return false;
-            } catch (SecurityException ex) {
-                mWidgetManager.getFocusedWindow().showAlert(
-                        getResources().getString(R.string.external_open_uri_error_title),
-                        getResources().getString(R.string.external_open_uri_error_security_exception_body, url),
-                        null);
-                return false;
-            }
-
-            return true;
-        }
     }
 }

@@ -97,7 +97,7 @@ class Services(val context: Context, places: Places): GeckoSession.NavigationDel
             type = DeviceType.VR,
             capabilities = setOf(DeviceCapability.SEND_TAB)
         ),
-        syncConfig = SyncConfig(setOf(SyncEngine.History, SyncEngine.Bookmarks, SyncEngine.Passwords), PeriodicSyncConfig(periodMinutes = 1440))
+        syncConfig = SyncConfig(setOf(SyncEngine.History, SyncEngine.Bookmarks, SyncEngine.Passwords), syncPeriodInMinutes = 1440L)
 
     ).also {
         it.registerForAccountEvents(deviceEventObserver, ProcessLifecycleOwner.get(), true)
@@ -117,7 +117,7 @@ class Services(val context: Context, places: Places): GeckoSession.NavigationDel
 
     private fun init() {
         CoroutineScope(Dispatchers.Main).launch {
-            accountManager.start()
+            accountManager.initAsync().await()
         }
     }
 
@@ -132,9 +132,9 @@ class Services(val context: Context, places: Places): GeckoSession.NavigationDel
                 val geckoResult = GeckoResult<AllowOrDeny>()
 
                 // Notify the state machine about our success.
+                val result = accountManager.finishAuthenticationAsync(FxaAuthData(action.toAuthType(), code = code, state = state))
                 CoroutineScope(Dispatchers.Main).launch {
-                    val result = accountManager.finishAuthentication(FxaAuthData(action.toAuthType(), code = code, state = state))
-                    if (!result) {
+                    if (!result.await()) {
                         android.util.Log.e(LOGTAG, "Authentication finish error.")
                         geckoResult.complete(AllowOrDeny.DENY)
 
@@ -146,10 +146,10 @@ class Services(val context: Context, places: Places): GeckoSession.NavigationDel
 
                 return geckoResult
             }
-            return GeckoResult.deny()
+            return GeckoResult.DENY
         }
 
-        return GeckoResult.allow()
+        return GeckoResult.ALLOW
     }
 
 }
