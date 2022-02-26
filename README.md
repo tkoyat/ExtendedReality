@@ -1,6 +1,6 @@
-# Extended Soul
+# Extended Reality
 
 ## Supported Devices:
 
-Oculus Quest 2
-iQIYI-A4
+Oculus Quest 2 
+iQIYI-A4 
