@@ -1,4 +1,11 @@
 # Development
+```
+Android Studio 3.5
+jdk 1.8
+gradle plugin 3.6.3
+gradle verison 5.6.4
+```
+
 Oculus Quest 2
 ```
 sdk 37.0
