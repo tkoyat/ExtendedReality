@@ -15,3 +15,9 @@ iQIYI-A4
 ```
 sdk 3.1.6
 ```
+
+Android local.properties ndk
+```
+https://developer.android.google.cn/ndk/downloads
+ndk.dir=C\:\\...\\Android\\Sdk\\ndk-r20b
+```
