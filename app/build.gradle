@@ -114,7 +114,7 @@ android {
             buildConfigField 'String', 'PROPS_ENDPOINT', '"http://mixedreality.mozilla.org/FirefoxReality/props.json"'
         }
         debug {
-            applicationIdSuffix getDevApplicationIdSuffix()
+            applicationIdSuffix ""
             pseudoLocalesEnabled true
             buildConfigField 'String', 'PROPS_ENDPOINT', '"http://mixedreality.mozilla.org/FirefoxReality/props.json"'
         }
