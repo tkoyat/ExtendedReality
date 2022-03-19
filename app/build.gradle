@@ -33,13 +33,6 @@ def getCrashRestartDisabled = { ->
     return "false"
 }
 
-def getDevApplicationIdSuffix = { ->
-    if (gradle.hasProperty("userProperties.simultaneousDevProduction")) {
-        return gradle."userProperties.simultaneousDevProduction" == "true" ? ".dev" : ""
-    }
-    return ""
-}
-
 def getUseDebugSigningOnRelease = { ->
     if (gradle.hasProperty("userProperties.useDebugSigningOnRelease")) {
         return gradle."userProperties.useDebugSigningOnRelease" == "true"
@@ -68,7 +61,7 @@ ext.gleanDocsDirectory = "$rootDir/docs"
 android {
     compileSdkVersion build_versions.target_sdk
     defaultConfig {
-        applicationId "org.mozilla.vrbrowser"
+        applicationId "com.tkoyat.extendedreality"
         minSdkVersion build_versions.min_sdk
         targetSdkVersion build_versions.target_sdk
         versionCode 1
