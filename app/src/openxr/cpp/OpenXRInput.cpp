@@ -438,8 +438,6 @@ const std::string OpenXRInput::GetControllerModelName(const int32_t aModelIndex)
         VRB_WARN("GetControllerModelName() failed.");
         return "";
     }
-  } else {
-    return "vr_controller_oculusgo.obj";
   }
 #else
 #error Platform controller not implemented
