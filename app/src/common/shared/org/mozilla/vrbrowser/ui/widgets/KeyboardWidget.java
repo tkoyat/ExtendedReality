@@ -689,22 +689,10 @@ public class KeyboardWidget extends UIWidget implements CustomKeyboardView.OnKey
         KeyboardInterface keyboard = getKeyboardForLocale(SettingsStore.getInstance(getContext()).getKeyboardLocale());
         if (keyboard != null) {
             handleLanguageChange(keyboard);
-            return;
-        }
-
-        // If the user has not selected any keyboard, find the best match from system locales.
-        LocaleList localeList = getResources().getConfiguration().getLocales();
-        String[] supportedLocales = new String[mKeyboards.size()];
-        for (int i = 0; i < mKeyboards.size(); ++i) {
-            supportedLocales[i] = mKeyboards.get(i).getLocale().toLanguageTag();
-        }
-        Locale bestMatch = localeList.getFirstMatch(supportedLocales);
-        keyboard = getKeyboardForLocale(bestMatch);
-        if (keyboard == null) {
-            // Fall back to english.
+        } else {
             keyboard = getKeyboardForLocale(Locale.ENGLISH);
+            handleLanguageChange(keyboard);
         }
-        handleLanguageChange(keyboard);
     }
 
     private KeyboardInterface getKeyboardForLocale(@Nullable Locale aLocale) {

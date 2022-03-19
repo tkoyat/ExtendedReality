@@ -717,7 +717,6 @@ public class VRBrowserActivity extends PlatformActivity implements WidgetManager
         }
     }
 
-
     @Override
     public void onBackPressed() {
         if (mIsPresentingImmersive) {
