@@ -9,7 +9,6 @@ import androidx.databinding.DataBindingUtil;
 import org.mozilla.vrbrowser.R;
 import org.mozilla.vrbrowser.VRBrowserActivity;
 import org.mozilla.vrbrowser.databinding.WebxrInterstitialControllerBinding;
-import org.mozilla.vrbrowser.utils.DeviceType;
 
 public class WebXRInterstitialController extends UIWidget {
     private WebxrInterstitialControllerBinding mBinding;
