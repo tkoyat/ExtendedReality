@@ -537,8 +537,7 @@ struct DeviceDelegateOculusVR::State {
         } else {
           VRB_WARN("Undefined hand type in DeviceDelegateOculusVR.");
         }
-        controller->SetButtonState(controllerState.index, ControllerDelegate::BUTTON_TOUCHPAD,
-                                   device::kImmersiveButtonThumbstick, trackpadPressed, trackpadTouched);
+        controller->SetButtonState(controllerState.index, ControllerDelegate::BUTTON_TOUCHPAD, device::kImmersiveButtonThumbstick, trackpadPressed, trackpadTouched);
         // This is always false in Oculus Browser.
         const bool thumbRest = false;
         controller->SetButtonState(controllerState.index, ControllerDelegate::BUTTON_OTHERS, device::kImmersiveButtonThumbrest, thumbRest, thumbRest);

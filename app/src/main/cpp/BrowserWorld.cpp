@@ -255,7 +255,7 @@ BrowserWorld::State::CheckBackButton() {
           VRBrowser::HandleBack();
           webXRInterstialState = WebXRInterstialState::HIDDEN;
       } else if (webXRInterstialState == WebXRInterstialState::ALLOW_DISMISS && controller.lastButtonState && controller.buttonState == 0) {
-          VRBrowser::OnDismissWebXRInterstitial();
+          VRBrowser::OnDismissWebXRInterstitial();  // todo： 出错后重新开启，不需要执行HandleBack
           VRBrowser::HandleBack();   // for debug
           webXRInterstialState = WebXRInterstialState::HIDDEN;
       }
