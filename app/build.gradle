@@ -33,6 +33,13 @@ def getCrashRestartDisabled = { ->
     return "false"
 }
 
+def getDevApplicationIdSuffix = { ->
+    if (gradle.hasProperty("userProperties.simultaneousDevProduction")) {
+        return gradle."userProperties.simultaneousDevProduction" == "true" ? ".dev" : ""
+    }
+    return ""
+}
+
 def getUseDebugSigningOnRelease = { ->
     if (gradle.hasProperty("userProperties.useDebugSigningOnRelease")) {
         return gradle."userProperties.useDebugSigningOnRelease" == "true"
@@ -114,7 +121,7 @@ android {
             buildConfigField 'String', 'PROPS_ENDPOINT', '"http://mixedreality.mozilla.org/FirefoxReality/props.json"'
         }
         debug {
-            applicationIdSuffix ""
+            applicationIdSuffix getDevApplicationIdSuffix()
             pseudoLocalesEnabled true
             buildConfigField 'String', 'PROPS_ENDPOINT', '"http://mixedreality.mozilla.org/FirefoxReality/props.json"'
         }
