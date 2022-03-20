@@ -233,7 +233,7 @@ struct DeviceDelegateOculusVR::State {
   }
 
   void UpdateDisplayRefreshRate() {
-    if (!ovr || !IsOculusGo()) {
+    if (!ovr) {
       return;
     }
     if (renderMode == device::RenderMode::StandAlone) {
@@ -286,10 +286,6 @@ struct DeviceDelegateOculusVR::State {
 
   bool IsOculusQuest() const {
     return deviceType == device::OculusQuest;
-  }
-
-  bool IsOculusGo() const {
-    return deviceType == device::OculusGo;
   }
 
   bool Is6DOF() const {
@@ -486,10 +482,8 @@ struct DeviceDelegateOculusVR::State {
       vrapi_GetCurrentInputState(ovr, controllerState.deviceId, &controllerState.inputState.Header);
 
       int32_t level = controllerState.inputState.BatteryPercentRemaining;
-      if (!IsOculusGo()) {
-        float value = (float)level / 100.0f;
-        level = (int)std::round((value * value) * 10.0f) * 10;
-      }
+      float value = (float)level / 100.0f;
+      level = (int)std::round((value * value) * 10.0f) * 10;
       controller->SetBatteryLevel(controllerState.index,level);
 
       reorientCount = controllerState.inputState.RecenterCount;
