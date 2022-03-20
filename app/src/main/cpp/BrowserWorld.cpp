@@ -251,13 +251,12 @@ BrowserWorld::State::CheckBackButton() {
           continue;
       }
 
-      if (!(controller.lastButtonState & ControllerDelegate::BUTTON_APP) &&
-          (controller.buttonState & ControllerDelegate::BUTTON_APP)) {
+      if (!(controller.lastButtonState & ControllerDelegate::BUTTON_APP) && (controller.buttonState & ControllerDelegate::BUTTON_APP)) {
           VRBrowser::HandleBack();
           webXRInterstialState = WebXRInterstialState::HIDDEN;
-      } else if (webXRInterstialState == WebXRInterstialState::ALLOW_DISMISS
-                 && controller.lastButtonState && controller.buttonState == 0) {
+      } else if (webXRInterstialState == WebXRInterstialState::ALLOW_DISMISS && controller.lastButtonState && controller.buttonState == 0) {
           VRBrowser::OnDismissWebXRInterstitial();
+          VRBrowser::HandleBack();   // for debug
           webXRInterstialState = WebXRInterstialState::HIDDEN;
       }
       controller.lastButtonState = controller.buttonState;
