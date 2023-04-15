@@ -117,7 +117,7 @@ android {
         release {
             minifyEnabled true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
-            signingConfig getUseDebugSigningOnRelease() ? debug.signingConfig : release.signingConfig
+            signingConfig signingConfigs.debug
             buildConfigField 'String', 'PROPS_ENDPOINT', '"http://mixedreality.mozilla.org/FirefoxReality/props.json"'
         }
         debug {

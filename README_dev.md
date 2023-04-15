@@ -8,10 +8,9 @@ gradle verison 5.6.4
 
 Oculus Quest 2
 ```
-sdk 37.0
+third_party/ovr_mobile/ for Oculus (should contain a VrApi folder) ovr_platform_sdk_50.0
+third_party/OVRPlatformSDK/ for Oculus (should contain a VrApi folder) ovr_sdk_mobile_1.50.0
 
-third_party/ovr_mobile/ for Oculus (should contain a VrApi folder)
-third_party/wavesdk/ for Vive (should contain a build folder, among other things)
 
 https://developer.oculus.com/downloads/native-android/
 https://developer.oculus.com/downloads/package/oculus-platform-sdk/
@@ -20,7 +19,7 @@ https://developer.oculus.com/downloads/package/oculus-platform-sdk/
 
 iQIYI-A4
 ```
-sdk 3.1.6
+third_party/wavesdk/ for Vive (should contain a build folder, among other things) sdk 3.1.6
 ```
 
 Android local.properties ndk
